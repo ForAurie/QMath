@@ -1,0 +1,232 @@
+#ifndef FUNCTION_H
+#define FUNCTION_H
+
+#include <vector>
+#include <complex>
+#include <cmath>
+#include "Geometry"
+namespace Function{
+using Geometry2D::Point;
+// T(1) = * + / (-相反数)
+template<typename T>
+class LinearFunction {
+    private:
+    T k, b;
+    public:
+    T getK() const { return k; }
+    T getB() const { return b; }
+    void setK(const T& __k) { k = __k; }
+    void setB(const T& __b) { b = __b; }
+    LinearFunction(const T& __k, const T& __b): k(__k), b(__b) {}
+    LinearFunction(const LinearFunction& o): k(o.k), b(o.b) {}
+    LinearFunction operator=(const LinearFunction& o) { k = o.a; b = o.b; }
+    T calc(const T& x) const {
+        return k * x + b;
+    }
+    LinearFunction inverse() const {
+        // assert(k != T(0));
+        return LinearFunction(T(1) / k, -b / k);
+    }
+    LinearFunction& inverseSelf() const {
+        // assert(k != T(0));
+        return *this = LinearFunction(T(1) / k, -b / k);
+    }
+    friend std::ostream& operator<<(std::ostream& os, const LinearFunction& p) {
+        os << "f(x) = " << p.k << "x + " << p.b;
+        return os;
+    }
+};
+// 支持 T(0), T(1), T(2), T(4) = * + (-相反数) / += -= complex<T>
+template<typename T>
+class QuadraticFunction {
+    private:
+    T a, b, c;
+    public:
+    T geta() const { return a; }
+    T getb() const { return b; }
+    T getc() const { return c; }
+    void seta(const T& __a)  {a = __a; }
+    void setb(const T& __b)  {b = __b; }
+    void setc(const T& __c)  {c = __c; }
+    QuadraticFunction(const T& __a, const T& __b, const T& __c): a(__a), b(__b), c(__c) {}
+    QuadraticFunction(const QuadraticFunction& o): a(o.a), b(o.b), c(o.c) {}
+    QuadraticFunction operator=(const QuadraticFunction& o) { a = o.a; b = o.b; c = o.c; }
+    T calc(const T& x) const {
+        return (a * x + b) * x + c;
+    }
+    T derivative(const T &x) const { // a * x + a * x + b
+        return T(2) * a * x + b;
+    }
+    Point<T> vertex() const {
+        return Point<T>(-b / (T(2) * a), (T(4) * a * c - b * b) / (T(4) * a));
+    }
+    T axis() const { // symmetricalAxis
+        return -b / (T(2) * a);
+    }
+    T delta() const {
+        return b * b - T(4) * a * c;
+    }
+    friend std::ostream& operator<<(std::ostream& os, const QuadraticFunction& p) {
+        os << "f(x) = " << p.a << "x ^ 2 + " << p.b << "x + " << p.c;
+        return os;
+    }
+};
+
+template<typename T = double,
+        T (*Sin)(T) = std::sin,
+        T (*Cos)(T) = std::cos>
+class Polynomial:public std::vector<T> {
+private:
+    T PI2;
+public:
+    using std::vector<T>::operator[];
+    Polynomial (const size_t& n = 0, const T& x = T(0), const T& PI = std::acos(-1)): std::vector<T>(n, x), PI2(T(2) * PI) {}
+    Polynomial (const Polynomial& o): std::vector<T>(o), PI2(o.PI2) {}
+    Polynomial& operator=(const Polynomial& o) {
+        this->resize(o.size());
+        PI2 = o.PI2;
+        for (size_t i = 0; i < this->size(); i++) {
+            operator[](i) = o[i];
+        }
+        return *this;
+    }
+    T derivative(const T &x) const {
+        T tmp(1), res(0);
+        for (size_t i = 1; i < this->size(); i++, tmp *= x) res += operator[](i) * i * tmp;
+        return res;
+    }
+    T calc(const T &x) {
+        T tmp(1), res(0);
+        for (size_t i = 0; i < this->size(); i++, tmp *= x) res += operator[](i) * tmp;
+        return res;
+    }
+    Polynomial operator+(const Polynomial& o) const {
+        Polynomial res(this->size() > o.size() ? (*this) : o);
+        if (this->size() > o.size()) {
+            for (size_t i = 0; i < o.size(); i++) res[i] += o[i];
+        } else {
+            for (size_t i = 0; i < this->size(); i++) res[i] += operator[](i);
+        }
+        return res;
+    }
+    Polynomial& operator+=(const Polynomial& o) {
+        if (this->size() < o.size()) this->resize(o.size(), T(0));
+        for (size_t i = 0; i < o.size(); i++) operator[](i) += o[i];
+        return *this;
+    }
+    Polynomial operator-(const Polynomial& o) const {
+        Polynomial res(*this);
+        if (this->size() < o.size()) res.resize(o.size(), T(0));
+        for (size_t i = 0; i < o.size(); i++) res[i] -= o[i];
+        return res;
+    }
+    Polynomial& operator-=(const Polynomial& o) {
+        if (this->size() < o.size()) this->resize(o.size(), T(0));
+        for (size_t i = 0; i < o.size(); i++) operator[](i) -= o[i];
+        return *this;
+    }
+    Polynomial operator*(const Polynomial o) const {
+        const size_t n = 1 << (std::__lg(this->size() + o.size() - 2) + 1);
+        std::vector<size_t> rev(n, 0);
+        std::vector<std::complex<T>> a(n, std::complex(T(0), T(0)));
+        for (size_t i = 1; i < n; i++) rev[i] = (rev[i >> 1] >> 1) | (i & 1 ) * (n >> 1);
+        for (size_t i = 0; i < this->size(); i++) a[i].real(operator[](i));
+        for (size_t i = 0; i < o.size(); i++) a[i].imag(o[i]);
+        for (size_t i = 0; i < n; i++) if (i < rev[i]) swap(a[i], a[rev[i]]);
+        std::complex<T> t(T(0), T(0));
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const std::complex<T> wn(Cos(PI2 / l), Sin(PI2 / l));
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                std::complex<T> w(T(1), T(0));  
+                for (size_t j = i; j < i + l2; j++, w *= wn)
+                    t = w * a[j + l2], a[j + l2] = a[j] - t, a[j] += t;
+            }
+        }
+        for (size_t i = 0; i < n; i++) a[i] *= a[i];
+        for (size_t i = 0; i < n; i++) if (i < rev[i]) swap(a[i], a[rev[i]]);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const std::complex<T> wn(Cos(PI2 / T(l)), -Sin(PI2 / T(l)));
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                std::complex<T> w(T(1), T(0));
+                for (size_t j = i; j < i + l2; j++, w *= wn)
+                    t = w * a[j + l2], a[j + l2] = a[j] - t, a[j] += t;
+            }
+        }
+        Polynomial res(this->size() + o.size() - 1, T(0));
+        const T div = 1 / T(n << 1);
+        for (size_t i = 0; i < res.size(); i++) res[i] = a[i].imag() * div;
+        return res;
+    }
+    Polynomial& operator*=(const Polynomial &o) {
+        const size_t n = 1 << (std::__lg(this->size() + o.size() - 2) + 1);
+        std::vector<size_t> rev(n, 0);
+        std::vector<std::complex<T>> a(n, std::complex(T(0), T(0)));
+        for (size_t i = 1; i < n; i++) rev[i] = (rev[i >> 1] >> 1) | (i & 1 ) * (n >> 1);
+        for (size_t i = 0; i < this->size(); i++) a[i].real(operator[](i));
+        for (size_t i = 0; i < o.size(); i++) a[i].imag(o[i]);
+        for (size_t i = 0; i < n; i++) if (i < rev[i]) swap(a[i], a[rev[i]]);
+        std::complex<T> t(T(0), T(0));
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const std::complex<T> wn(Cos(PI2 / T(l)), Sin(PI2 / T(l)));
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                std::complex<T> w(T(1), T(0));  
+                for (size_t j = i; j < i + l2; j++, w *= wn)
+                    t = w * a[j + l2], a[j + l2] = a[j] - t, a[j] += t;
+            }
+        }
+        for (size_t i = 0; i < n; i++) a[i] *= a[i];
+        for (size_t i = 0; i < n; i++) if (i < rev[i]) swap(a[i], a[rev[i]]);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const std::complex<T> wn(Cos(PI2 / l), -Sin(PI2 / l));
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                std::complex<T> w(T(1), T(0));
+                for (size_t j = i; j < i + l2; j++, w *= wn)
+                    t = w * a[j + l2], a[j + l2] = a[j] - t, a[j] += t;
+            }
+        }
+        this->resize(this->size() + o.size() - 1, T(0));
+        const T div = 1 / T(n << 1);
+        for (size_t i = 0; i < this->size(); i++) operator[](i) = a[i].imag() * div;
+        return *this;
+    }
+    friend std::ostream& operator<<(std::ostream& os, const Polynomial& p) {
+        os << "f(x) = ";
+        for (size_t i = 0; i < p.size(); i++) {
+            os << p[i] << "x ^ " << i;
+            if (i != p.size() - 1) {
+                os << " + ";
+            }
+        }
+        return os;
+    }
+};
+}
+
+using Function::Polynomial;
+using Function::LinearFunction;
+using Function::QuadraticFunction;
+// #include <iostream>
+// using namespace std;
+// int main() {
+//     ios::sync_with_stdio(false);
+//     cin.tie(nullptr);
+//     QuadraticFunction<double> t(1, 1, 1);
+//     cout << t.vertex() << endl;
+//     int n, m;
+//     cin >> n >> m;
+//     Polynomial<double> a(n + 1), b(m + 1);
+//     for (int i = 0; i <= n; i++) cin >> a[i];
+//     for (int j = 0; j <= m; j++) cin >> b[j];
+//     a *= b;
+//     cout << a << endl;
+//     for (auto &tmp:a) {
+//         cout << (int) (tmp + 0.5) << ' ';
+//     }
+//     return 0;
+// }
+#endif 
+

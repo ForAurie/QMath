@@ -1,0 +1,162 @@
+#ifndef MATRIX_H
+#define MATRIX_H
+
+#include <vector>
+#include <iostream>
+#include <cassert>
+
+template<typename Type>
+class Matrix {
+	private:
+	int n, m;
+	std::vector<std::vector<Type>> a;
+	public:
+	Matrix(const int &__n, const int &__m, const Type &x = 0): n(__n), m(__m), a(n, std::vector<Type>(m, x)) {}
+	Matrix(const std::vector<std::vector<Type>> &x): n(x.size()), m(x.front().size()), a(x) {}
+	Matrix(const Matrix &o): n(o.n), m(o.m), a(o.a) {}
+	Matrix& operator = (const Matrix &o) { n = o.n; m = o.m; a = o.a; return *this; }
+	Matrix& operator = (const std::vector<std::vector<Type>> &o) { n = o.size(); m = o.front().size(); a = o; return *this; }
+	std::vector<std::vector<Type>> toVector() const { return a; }
+
+
+	// move
+	Matrix(Matrix&& o) noexcept : n(o.n), m(o.m), a(std::move(o.a)) { o.n = o.m = 0; }
+	Matrix& operator=(Matrix&& o) noexcept {
+		if (this != &o) {
+			n = o.n;
+			m = o.m;
+			a = std::move(o.a);
+			o.n = o.m = 0;
+		}
+		return *this;
+	}
+
+	const int n() { return n; }
+	const int m() { return m; }
+	const Type& operator () (const int row, const int col) const { return a[row][col]; }
+	Type& operator () (const int row, const int col) { return a[row][col]; }
+	std::vector<Type>& operator [] (const int row) { return a[row]; }
+	const std::vector<Type>& operator [] (const int row) const { return a[row]; }
+	
+	Matrix transpose() const {
+		Matrix res(m, n);
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				res.a[j][i] = a[i][j];
+			}
+		}
+		return res;
+	}
+
+	Matrix& operator *= (const Matrix &o) {
+		// assert(m == o.n);
+		Matrix res(n, o.m, 0);
+		Type tmp;
+		for (int i = 0; i < n; ++i) {
+			for (int k = 0; k < m; ++k) {
+				tmp = a[i][k];
+				for (int j = 0; j < o.m; ++j) {			
+					res.a[i][j] += tmp * o.a[k][j];
+				}
+			}
+		}
+		return *this = std::move(res);
+	}
+	const Matrix operator * (const Matrix &o) const {
+		// assert(m == o.n);
+		Matrix res(n, o.m, 0);
+		Type tmp;
+		for (int i = 0; i < n; ++i) {
+			for (int k = 0; k < m; ++k) {
+				tmp = a[i][k];
+				for (int j = 0; j < o.m; ++j) {			
+					res.a[i][j] += tmp * o.a[k][j];
+				}
+			}
+		}
+		return res;
+	}
+	Matrix& operator += (const Matrix &o) {
+		// assert(n == o.n && m == o.m);
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				a[i][j] += o.a[i][j];
+			}
+		}
+		return *this;
+	}
+	const Matrix operator + (const Matrix &o) const {
+		// assert(n == o.n && m == o.m);
+		Matrix res = *this;
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				res.a[i][j] += o.a[i][j];
+			}
+		}
+		return res;
+	}
+	Matrix& operator -= (const Matrix &o) {
+		// assert(n == o.n && m == o.m);
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				a[i][j] -= o.a[i][j];
+			}
+		}
+		return *this;
+	}
+	const Matrix operator - (const Matrix &o) const {
+		// assert(n == o.n && m == o.m);
+		Matrix res = *this;
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				res.a[i][j] -= o.a[i][j];
+			}
+		}
+		return res;
+	}
+	Matrix& operator *= (const Type &o) {
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				a[i][j] *= o;
+			}
+		}
+		return *this;
+	}
+	const Matrix operator * (const Type &o) const {
+		Matrix res = *this;
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				res.a[i][j] *= o;
+			}
+		}
+		return res;
+	}
+	Matrix& operator += (const Type &o) {
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				a[i][j] += o;
+			}
+		}
+		return *this;
+	}
+	const Matrix operator + (const Type &o) const {
+		Matrix res = *this;
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				res.a[i][j] += o;
+			}
+		}
+		return res;
+	}
+	void show(std::ostream& out = std::cout) const {
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < m; ++j) {
+				out << a[i][j] << ' ';
+			}
+			out << '\n';
+		}
+		out << std::endl;
+	}
+};
+
+#endif
