@@ -13,8 +13,8 @@ class LinearFunction {
     private:
     T k, b;
     public:
-    T getK() const { return k; }
-    T getB() const { return b; }
+    const T& getK() const { return k; }
+    const T& getB() const { return b; }
     void setK(const T& __k) { k = __k; }
     void setB(const T& __b) { b = __b; }
     LinearFunction(const T& __k, const T& __b): k(__k), b(__b) {}
@@ -42,9 +42,9 @@ class QuadraticFunction {
     private:
     T a, b, c;
     public:
-    T geta() const { return a; }
-    T getb() const { return b; }
-    T getc() const { return c; }
+    const T& geta() const { return a; }
+    const T& getb() const { return b; }
+    const T& getc() const { return c; }
     void seta(const T& __a)  {a = __a; }
     void setb(const T& __b)  {b = __b; }
     void setc(const T& __c)  {c = __c; }

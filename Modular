@@ -31,35 +31,35 @@ public:
     T getVal() const { return value; }
     void setVal(const T& v) { value = v; }
     // 算术运算
-    inline Modular operator+(const Modular& other) const { 
+    Modular operator+(const Modular& other) const { 
         T result = value + other.value; 
         if (result >= MOD) { result -= MOD; } 
         return Modular(result);
     }
-    inline Modular operator-(const Modular& other) const { 
+    Modular operator-(const Modular& other) const { 
         T result = value - other.value; 
         if (result < 0) { result += MOD; }
         return Modular(result);
     }
-    inline Modular operator*(const Modular& other) const { 
+    Modular operator*(const Modular& other) const { 
         return Modular(static_cast<MultiplicationType>(value) * other.value % MOD); 
     }
-    inline Modular& operator+=(const Modular& other) { 
+    Modular& operator+=(const Modular& other) { 
         value += other.value; 
         if (value >= MOD) { value -= MOD; } 
         return *this; 
     }
-    inline Modular& operator-=(const Modular& other) { 
+    Modular& operator-=(const Modular& other) { 
         value -= other.value; 
         if (value < 0) { value += MOD; } 
         return *this; 
     }
-    inline Modular& operator*=(const Modular& other) { 
+    Modular& operator*=(const Modular& other) { 
         value = static_cast<MultiplicationType>(value) * other.value % MOD; 
         return *this; 
     }
     // 快速幂 (unsigned int)
-    inline Modular fPow(unsigned int exp) const {
+    Modular fPow(unsigned int exp) const {
         Modular result(1), base(value);
         while (exp) {
             if (exp & 1) result *= base;
@@ -67,9 +67,18 @@ public:
             exp >>= 1;
         }
         return result;
+    }
+    Modular& fPowSelf(unsigned int exp) {
+        Modular result(1), base(value);
+        while (exp) {
+            if (exp & 1) result *= base;
+            base *= base;
+            exp >>= 1;
+        }
+        return *this = result;
     }
     // 快速幂 (unsigned long long)
-    inline Modular fPow(unsigned long long exp) const {
+    Modular fPow(unsigned long long exp) const {
         Modular result(1), base(value);
         while (exp) {
             if (exp & 1) result *= base;
@@ -77,9 +86,18 @@ public:
             exp >>= 1;
         }
         return result;
+    }
+    Modular& fPowSelf(unsigned long long exp) {
+        Modular result(1), base(value);
+        while (exp) {
+            if (exp & 1) result *= base;
+            base *= base;
+            exp >>= 1;
+        }
+        return *this = result;
     }
     // 快速幂 (int)
-    inline Modular fPow(int exp) const {
+    Modular fPow(int exp) const {
         Modular result(1), base(value);
         while (exp) {
             if (exp & 1) result *= base;
@@ -87,9 +105,18 @@ public:
             exp >>= 1;
         }
         return result;
+    }
+    Modular& fPowSelf(int exp) {
+        Modular result(1), base(value);
+        while (exp) {
+            if (exp & 1) result *= base;
+            base *= base;
+            exp >>= 1;
+        }
+        return *this = result;
     }
     // 快速幂 (long long)
-    inline Modular fPow(long long exp) const {
+    Modular fPow(long long exp) const {
         Modular result(1), base(value);
         while (exp) {
             if (exp & 1) result *= base;
@@ -98,39 +125,35 @@ public:
         }
         return result;
     }
+    Modular& fPowSelf(long long exp) {
+        Modular result(1), base(value);
+        while (exp) {
+            if (exp & 1) result *= base;
+            base *= base;
+            exp >>= 1;
+        }
+        return *this = result;
+    }
     // 求逆元
-    inline Modular inv() const {
+    Modular inv() const {
         T x, y;
         T g = exgcd(value, MOD, x, y);
         assert(g == 1);
         return Modular(x);
     }
-    inline Modular& invSelf() {
+    Modular& invSelf() {
         T x, y;
         T g = exgcd(value, MOD, x, y);
-        assert(g == 1);
+        assert(g == 1); 
         value = x;
         return *this;
     }
     // 除法运算
-    inline Modular operator/(const Modular& other) const { return *this * other.inv(); }
-    inline Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
+    Modular operator/(const Modular& other) const { return *this * other.inv(); }
+    Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
     // 比较运算
-    inline bool operator==(const Modular& other) const { return value == other.value; }
-    inline bool operator!=(const Modular& other) const { return value != other.value; }
+    bool operator==(const Modular& other) const { return value == other.value; }
+    bool operator!=(const Modular& other) const { return value != other.value; }
 };
 
 #endif
-
-// # include<iostream>
-// using namespace std;
-// int main() {
-//     Modular<int, 100000, long long> a;
-//     a.setVal(3);
-//     a.invSelf();
-//     auto b = a;
-//     b.setVal(3);
-//     a *= b;
-//     cout << a.val();
-//     return 0;
-// }
