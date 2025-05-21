@@ -155,5 +155,15 @@ public:
     bool operator==(const Modular& other) const { return value == other.value; }
     bool operator!=(const Modular& other) const { return value != other.value; }
 };
+// #include <iostream>
+// using namespace std;
 
+// double tt(double x) { return x; }
+
+// int main() {
+// 	Modular<int, 1000000007, long long> a(3);
+//     a *= a;
+//     cout << a.getVal();
+// 	return 0;
+// }
 #endif

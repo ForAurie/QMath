@@ -80,8 +80,8 @@ private:
     T PI2;
 public:
     using std::vector<T>::operator[];
-    Polynomial (const size_t& n = 0, const T& x = T(0), const T& PI = std::acos(-1)): std::vector<T>(n, x), PI2(T(2) * PI) {}
-    Polynomial (const Polynomial& o): std::vector<T>(o), PI2(o.PI2) {}
+    Polynomial(const size_t& n = 0, const T& x = T(0), const T& PI = std::acos(-1)): std::vector<T>(n, x), PI2(T(2) * PI) {}
+    Polynomial(const Polynomial& o): std::vector<T>(o), PI2(o.PI2) {}
     Polynomial& operator=(const Polynomial& o) {
         this->resize(o.size());
         PI2 = o.PI2;

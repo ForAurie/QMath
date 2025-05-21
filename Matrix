@@ -2,9 +2,8 @@
 #define MATRIX_H
 
 #include <vector>
-#include <iostream>
 #include <cassert>
-
+#include <cmath>
 template<typename Type>
 class Matrix {
 	private:
@@ -175,10 +174,101 @@ class Matrix {
     }
 };
 
-#endif
-#include <iostream>
-using namespace std;
+template<typename T,
+         T (*Sqrt)(T) = std::sqrt>
+class Vector:public std::vector<T> {
+public:
+	using std::vector<T>::operator[];
+	Vector(const size_t& n = 0, const T& x = T(0)): std::vector<T>(n, x) {}
+	Vector(const Vector& o): std::vector<T>(o) {}
+	Vector(const std::vector<T>& o): std::vector<T>(o) {}
+    Vector& operator=(const Vector& o) {
+        this->resize(o.size());
+        for (size_t i = 0; i < this->size(); i++) {
+            operator[](i) = o[i];
+        }
+        return *this;
+    }
+	Vector operator+(const Vector& o) const {
+		// assert(this->size() == o.size());
+		Vector res(*this);
+		for (size_t i = 0; i < this->size(); i++) res[i] += o[i];
+		return res;
+	}
+	Vector operator-(const Vector& o) const {
+		// assert(this->size() == o.size());
+		Vector res(*this);
+		for (size_t i = 0; i < this->size(); i++) res[i] -= o[i];
+		return res;
+	}
+	Vector& operator+=(const Vector& o) {
+		// assert(this->size() == o.size());
+		for (size_t i = 0; i < this->size(); i++) operator[](i) += o[i];
+		return *this;
+	}
+	Vector& operator-=(const Vector& o) {
+		// assert(this->size() == o.size());
+		for (size_t i = 0; i < this->size(); i++) operator[](i) -= o[i];
+		return *this;
+	}
+	T operator*(const Vector& o) const {
+		// assert(this->size() == o.size());
+		T res(0);
+		for (size_t i = 0; i < this->size(); i++) res += operator[](i) * o[i];
+		return res;
+	}
+	Vector operator*(const T& o) const {
+		Vector res(*this);
+		for (size_t i = 0; i < res.size(); i++) res[i] *= o;
+		return res;
+	}
+	Vector& operator*=(const T& o) {
+		for (size_t i = 0; i < this->size(); i++) operator[](i) *= o;
+		return *this;
+	}
+	Vector operator/(const T& o) const {
+		Vector res(*this);
+		for (size_t i = 0; i < res.size(); i++) res[i] /= o;
+		return res;
+	}
+	Vector& operator/=(const T& o) {
+		for (size_t i = 0; i < this->size(); i++) operator[](i) /= o;
+		return *this;
+	}
+	T length() const {
+		T res(0);
+		for (size_t i = 0; i < this->size(); i++) {
+			res += operator[](i) * operator[](i);
+		}
+		return Sqrt(res);
+	}
+	T length2() {
+		T res(0);
+		for (size_t i = 0; i < this->size(); i++) {
+			res += operator[](i) * operator[](i);
+		}
+		return res;
+	}
+};
 
-int main() {
-	return 0;
+template<typename T,
+         T (*Sqrt)(T) = std::sqrt>
+Vector<T, Sqrt> operator*(const T& o, const Vector<T, Sqrt>& a) {
+	Vector<T, Sqrt> res(a);
+	for (size_t i = 0; i < a.size(); i++) res[i] *= o;
+	return res;
 }
+
+// #include <iostream>
+// using namespace std;
+
+// double tt(double x) { return x; }
+
+// int main() {
+// 	Vector<double> a(2, 1.5);
+// 	a = (double)2 * a;
+// 	a[1] = 4;
+// 	cout << a * a << endl;
+// 	return 0;
+// }
+#endif

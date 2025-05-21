@@ -1,11 +1,15 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
-# include <cmath>
-# include <iostream>
+#include <cmath>
+#include <iostream>
 namespace Geometry2D {
 
-template<typename T>
+template<typename T,
+         T (*Sqrt)(T) = std::sqrt,
+         T (*Sin)(T) = std::sin,
+         T (*Cos)(T) = std::cos
+>
 class Point {
 private:
     T x, y;
@@ -59,7 +63,7 @@ public:
         return x * o.y - y * o.x;
     }
     T length() const {
-        return std::sqrt(x * x + y * y);
+        return Sqrt(x * x + y * y);
     }
     T length2() const {
         return x * x + y * y;
@@ -69,27 +73,27 @@ public:
         return Point(x / len, y / len);
     }
     Point rotate(const T& angle) const {
-        const T cosA = std::cos(angle);
-        const T sinA = std::sin(angle);
+        const T cosA = Cos(angle);
+        const T sinA = Sin(angle);
         return Point(x * cosA + y * sinA, -x * sinA + y * cosA);
     }
     Point rotate(const T& angle, const Point<T>& center) const {
-        const T cosA = std::cos(angle);
-        const T sinA = std::sin(angle);
+        const T cosA = Cos(angle);
+        const T sinA = Sin(angle);
         return Point((x - center.x) * cosA + (y - center.y) * sinA + center.x,
                       -(x - center.x) * sinA + (y - center.y) * cosA + center.y);
     }
     Point& rotateSelf(const T& angle) {
-        const T cosA = std::cos(angle);
-        const T sinA = std::sin(angle);
+        const T cosA = Cos(angle);
+        const T sinA = Sin(angle);
         const T x_ = x * cosA + y * sinA;
         y = -x * sinA + y * cosA;
         x = x_;
         return *this;
     }
     Point& rotateSelf(const T& angle, const Point<T>& center) {
-        const T cosA = std::cos(angle);
-        const T sinA = std::sin(angle);
+        const T cosA = Cos(angle);
+        const T sinA = Sin(angle);
         const T x_ = (x - center.x) * cosA + (y - center.y) * sinA + center.x;
         y = -(x - center.x) * sinA + (y - center.y) * cosA + center.y;
         x = x_;
@@ -132,9 +136,13 @@ public:
     // }
 };
 
-template<typename T>
-Point<T> operator*(const T& scalar, const Point<T>& o) {
-    return Point(o.x * scalar, o.y * scalar);
+template<typename T,
+         T (*Sqrt)(T) = std::sqrt,
+         T (*Sin)(T) = std::sin,
+         T (*Cos)(T) = std::cos
+>
+Point<T, Sqrt, Sin, Cos> operator*(const T& scalar, const Point<T, Sqrt, Sin, Cos>& o) {
+    return Point<T, Sqrt, Sin, Cos>(o.x * scalar, o.y * scalar);
 }
 
 template<typename T>
