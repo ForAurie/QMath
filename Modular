@@ -1,6 +1,8 @@
 #ifndef MODULAR_H
 #define MODULAR_H
 #include <cassert>
+namespace Modular {
+
 template <typename T, const T MOD, typename MultiplicationType>
 class Modular {
 private:
@@ -11,7 +13,7 @@ private:
             return a;
         }
         T g = exgcd(b, a % b, y, x);
-        y -= static_cast<MultiplicationType>(a / b) * x % MOD;
+        y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
         if (y < 0) y += MOD;
         if (y >= MOD) y -= MOD;
         return g;
@@ -27,7 +29,7 @@ public:
     operator long long() const { return static_cast<long long>(value); }
     operator double() const { return static_cast<double>(value); }
     operator float() const { return static_cast<float>(value); }
-    operator bool() const { return value != 0; }
+    operator bool() const { return value != T(0); }
     T getVal() const { return value; }
     void setVal(const T& v) { value = v; }
     // 算术运算
@@ -42,7 +44,7 @@ public:
         return Modular(result);
     }
     Modular operator*(const Modular& other) const { 
-        return Modular(static_cast<MultiplicationType>(value) * other.value % MOD); 
+        return Modular(static_cast<MultiplicationType>(value) * static_cast<MultiplicationType>(other.value) % MOD); 
     }
     Modular& operator+=(const Modular& other) { 
         value += other.value; 
@@ -55,11 +57,11 @@ public:
         return *this; 
     }
     Modular& operator*=(const Modular& other) { 
-        value = static_cast<MultiplicationType>(value) * other.value % MOD; 
+        value = static_cast<MultiplicationType>(value) * static_cast<MultiplicationType>(other.value) % MOD; 
         return *this; 
     }
-    // 快速幂 (unsigned int)
-    Modular fPow(unsigned int exp) const {
+    template <typename U>
+    Modular fPow(U exp) const {
         Modular result(1), base(value);
         while (exp) {
             if (exp & 1) result *= base;
@@ -68,64 +70,8 @@ public:
         }
         return result;
     }
-    Modular& fPowSelf(unsigned int exp) {
-        Modular result(1), base(value);
-        while (exp) {
-            if (exp & 1) result *= base;
-            base *= base;
-            exp >>= 1;
-        }
-        return *this = result;
-    }
-    // 快速幂 (unsigned long long)
-    Modular fPow(unsigned long long exp) const {
-        Modular result(1), base(value);
-        while (exp) {
-            if (exp & 1) result *= base;
-            base *= base;
-            exp >>= 1;
-        }
-        return result;
-    }
-    Modular& fPowSelf(unsigned long long exp) {
-        Modular result(1), base(value);
-        while (exp) {
-            if (exp & 1) result *= base;
-            base *= base;
-            exp >>= 1;
-        }
-        return *this = result;
-    }
-    // 快速幂 (int)
-    Modular fPow(int exp) const {
-        Modular result(1), base(value);
-        while (exp) {
-            if (exp & 1) result *= base;
-            base *= base;
-            exp >>= 1;
-        }
-        return result;
-    }
-    Modular& fPowSelf(int exp) {
-        Modular result(1), base(value);
-        while (exp) {
-            if (exp & 1) result *= base;
-            base *= base;
-            exp >>= 1;
-        }
-        return *this = result;
-    }
-    // 快速幂 (long long)
-    Modular fPow(long long exp) const {
-        Modular result(1), base(value);
-        while (exp) {
-            if (exp & 1) result *= base;
-            base *= base;
-            exp >>= 1;
-        }
-        return result;
-    }
-    Modular& fPowSelf(long long exp) {
+    template <typename U>
+    Modular& fPowSelf(U exp) {
         Modular result(1), base(value);
         while (exp) {
             if (exp & 1) result *= base;
@@ -155,15 +101,6 @@ public:
     bool operator==(const Modular& other) const { return value == other.value; }
     bool operator!=(const Modular& other) const { return value != other.value; }
 };
-// #include <iostream>
-// using namespace std;
 
-// double tt(double x) { return x; }
-
-// int main() {
-// 	Modular<int, 1000000007, long long> a(3);
-//     a *= a;
-//     cout << a.getVal();
-// 	return 0;
-// }
+}
 #endif
