@@ -157,7 +157,7 @@ public:
         return res;
     }
     Polynomial& operator*=(const Polynomial &o) {
-        const size_t n = 1 << (std::__lg(this->size() + o.size() - 2) + 1);
+        const size_t n = size_t(1) << (std::__lg(this->size() + o.size() - 2) + 1);
         std::vector<size_t> rev(n, 0);
         std::vector<std::complex<T>> a(n, std::complex<T>(T(0), T(0)));
         for (size_t i = 1; i < n; i++) rev[i] = (rev[i >> 1] >> 1) | (i & 1 ) * (n >> 1);
@@ -190,6 +190,155 @@ public:
         for (size_t i = 0; i < this->size(); i++) operator[](i) = a[i].imag() * div;
         return *this;
     }
+    Polynomial operator^(const Polynomial &o) const {
+        const size_t n = size_t(1) << (std::__lg(std::max(this->size(), o.size()) - 1) + 1);
+        Polynomial res(n, T(0));
+        std::vector<T> b(n, T(0));
+        for (size_t i = 0; i < this->size(); i++) res[i] = operator[](i);
+        for (size_t i = 0; i < o.size(); i++) b[i] = o[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = 0; j < k; j++) {
+                    res[i + j] += res[i + j + k];
+                    res[i + j + k] = res[i + j] - res[i + j + k] * T(2);
+                    b[i + j] += b[i + j + k];
+                    b[i + j + k] = b[i + j] - b[i + j + k] * T(2);
+                }
+            }
+        }
+        for (size_t i = 0; i < n; i++) res[i] *= b[i];
+        const T div2 = T(1) / T(2);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = 0; j < k; j++) {
+                    res[i + j] += res[i + j + k];
+                    res[i + j + k] = res[i + j] - res[i + j + k] * T(2);
+                    res[i + j] *= div2;
+                    res[i + j + k] *= div2;
+                }
+            }
+        }
+        return res;
+    }
+    Polynomial& operator^=(const Polynomial &o) {
+        const size_t n = size_t(1) << (std::__lg(std::max(this->size(), o.size()) - 1) + 1);
+        this->resize(n, T(0));
+        std::vector<T> b(n, T(0));
+        for (size_t i = 0; i < o.size(); i++) b[i] = o[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = 0; j < k; j++) {
+                    operator[](i + j) += operator[](i + j + k);
+                    operator[](i + j + k) = operator[](i + j) - operator[](i + j + k) * T(2);
+                    b[i + j] += b[i + j + k];
+                    b[i + j + k] = b[i + j] - b[i + j + k] * T(2);
+                }
+            }
+        }
+        for (int i = 0; i < n; i++) operator[](i) *= b[i];
+        const T div2 = T(1) / T(2);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = 0; j < k; j++) {
+                    operator[](i + j) += operator[](i + j + k);
+                    operator[](i + j + k) = operator[](i + j) - operator[](i + j + k) * T(2);
+                    operator[](i + j) *= div2;
+                    operator[](i + j + k) *= div2;
+                }
+            }
+        }
+        return *this;
+    }
+    Polynomial operator&(const Polynomial &o) const {
+        const size_t n = size_t(1) << (std::__lg(std::max(this->size(), o.size()) - 1) + 1);
+        Polynomial res(n, T(0));
+        std::vector<T> b(n, T(0));
+        for (size_t i = 0; i < this->size(); i++) res[i] = operator[](i);
+        for (size_t i = 0; i < o.size(); i++) b[i] = o[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; j++)
+                    res[i + j] += res[i + j + k],
+                    b[i + j] += b[i + j + k];
+        }
+        for (size_t i = 0; i < n; i++) res[i] *= b[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; j++)
+                    res[i + j] -= res[i + j + k];
+        }
+        return res;
+    }
+    Polynomial& operator&=(const Polynomial &o) {
+        const size_t n = size_t(1) << (std::__lg(std::max(this->size(), o.size()) - 1) + 1);
+        this->resize(n, T(0));
+        std::vector<T> b(n, T(0));
+        for (size_t i = 0; i < o.size(); i++) b[i] = o[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; j++)
+                    operator[](i + j) += operator[](i + j + k),
+                    b[i + j] += b[i + j + k];
+        }
+        for (int i = 0; i < n; i++) operator[](i) *= b[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; j++)
+                    operator[](i + j) -= operator[](i + j + k);
+        }
+        return *this;
+    }
+    Polynomial operator|(const Polynomial &o) const {
+        const size_t n = size_t(1) << (std::__lg(std::max(this->size(), o.size()) - 1) + 1);
+        Polynomial res(n, T(0));
+        std::vector<T> b(n, T(0));
+        for (size_t i = 0; i < this->size(); i++) res[i] = operator[](i);
+        for (size_t i = 0; i < o.size(); i++) b[i] = o[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; ++j)
+                    res[i + j + k] += res[i + j],
+                    b[i + j + k] += b[i + j];
+        }
+        for (size_t i = 0; i < n; i++) res[i] *= b[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; ++j)
+                    res[i + j + k] -= res[i + j];
+        }
+        return res;
+    }
+    Polynomial& operator|=(const Polynomial &o) {
+        const size_t n = size_t(1) << (std::__lg(std::max(this->size(), o.size()) - 1) + 1);
+        this->resize(n, T(0));
+        std::vector<T> b(n, T(0));
+        for (size_t i = 0; i < o.size(); i++) b[i] = o[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; ++j)
+                    operator[](i + j + k) += operator[](i + j),
+                    b[i + j + k] += b[i + j];
+        }
+        for (int i = 0; i < n; i++) operator[](i) *= b[i];
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t k = l >> 1;
+            for (size_t i = 0; i < n; i += l)
+                for (size_t j = 0; j < k; ++j)
+                    operator[](i + j + k) -= operator[](i + j);
+        }
+        return *this;
+    }
     friend std::ostream& operator<<(std::ostream& os, const Polynomial& p) {
         os << "f(x) = ";
         for (size_t i = 0; i < p.size(); i++) {
@@ -202,5 +351,4 @@ public:
     }
 };
 }
-#endif 
-
+#endif

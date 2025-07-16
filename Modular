@@ -31,7 +31,7 @@ public:
     operator float() const { return static_cast<float>(value); }
     operator bool() const { return value != T(0); }
     T getVal() const { return value; }
-    void setVal(const T& v) { value = v; }
+    Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
     // 算术运算
     Modular operator+(const Modular& other) const { 
         T result = value + other.value; 
