@@ -6,7 +6,6 @@
 #include <cmath>
 #include "Geometry"
 namespace Function{
-using Geometry2D::Point;
 // T(1) = * + / (-相反数)
 template<typename T>
 class LinearFunction {
@@ -24,11 +23,9 @@ class LinearFunction {
         return k * x + b;
     }
     LinearFunction inverse() const {
-        // assert(k != T(0));
         return LinearFunction(T(1) / k, -b / k);
     }
     LinearFunction& inverseSelf() const {
-        // assert(k != T(0));
         return *this = LinearFunction(T(1) / k, -b / k);
     }
     friend std::ostream& operator<<(std::ostream& os, const LinearFunction& p) {
@@ -57,8 +54,8 @@ class QuadraticFunction {
     T derivative(const T &x) const { // a * x + a * x + b
         return T(2) * a * x + b;
     }
-    Point<T> vertex() const {
-        return Point<T>(-b / (T(2) * a), (T(4) * a * c - b * b) / (T(4) * a));
+    Geometry2D::Point<T> vertex() const {
+        return Geometry2D::Point<T>(-b / (T(2) * a), (T(4) * a * c - b * b) / (T(4) * a));
     }
     T axis() const { // symmetricalAxis
         return -b / (T(2) * a);
@@ -128,7 +125,7 @@ public:
     Polynomial operator*(const Polynomial o) const {
         const size_t n = 1 << (std::__lg(this->size() + o.size() - 2) + 1);
         std::vector<size_t> rev(n, 0);
-        std::vector<std::complex<T>> a(n, std::complex(T(0), T(0)));
+        std::vector<std::complex<T>> a(n, std::complex<T>(T(0), T(0)));
         for (size_t i = 1; i < n; i++) rev[i] = (rev[i >> 1] >> 1) | (i & 1 ) * (n >> 1);
         for (size_t i = 0; i < this->size(); i++) a[i].real(operator[](i));
         for (size_t i = 0; i < o.size(); i++) a[i].imag(o[i]);
@@ -162,7 +159,7 @@ public:
     Polynomial& operator*=(const Polynomial &o) {
         const size_t n = 1 << (std::__lg(this->size() + o.size() - 2) + 1);
         std::vector<size_t> rev(n, 0);
-        std::vector<std::complex<T>> a(n, std::complex(T(0), T(0)));
+        std::vector<std::complex<T>> a(n, std::complex<T>(T(0), T(0)));
         for (size_t i = 1; i < n; i++) rev[i] = (rev[i >> 1] >> 1) | (i & 1 ) * (n >> 1);
         for (size_t i = 0; i < this->size(); i++) a[i].real(operator[](i));
         for (size_t i = 0; i < o.size(); i++) a[i].imag(o[i]);
@@ -205,28 +202,5 @@ public:
     }
 };
 }
-
-using Function::Polynomial;
-using Function::LinearFunction;
-using Function::QuadraticFunction;
-// #include <iostream>
-// using namespace std;
-// int main() {
-//     ios::sync_with_stdio(false);
-//     cin.tie(nullptr);
-//     QuadraticFunction<double> t(1, 1, 1);
-//     cout << t.vertex() << endl;
-//     int n, m;
-//     cin >> n >> m;
-//     Polynomial<double> a(n + 1), b(m + 1);
-//     for (int i = 0; i <= n; i++) cin >> a[i];
-//     for (int j = 0; j <= m; j++) cin >> b[j];
-//     a *= b;
-//     cout << a << endl;
-//     for (auto &tmp:a) {
-//         cout << (int) (tmp + 0.5) << ' ';
-//     }
-//     return 0;
-// }
 #endif 
 
