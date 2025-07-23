@@ -32,19 +32,23 @@ class Matrix {
 			for (size_t j = 0; j < m; ++j)
 				data[i * m + j] = x[i][j];
 	}
-	Matrix(const Matrix& o): n(o.n), m(o.m), data(std::make_unique<Type[]>(o.n * o.m)) {
-		std::copy(o.data.get(), o.data.get() + n * m, data.get());
+	Matrix(const Matrix& o): n(o.n), m(o.m), data(nullptr) {
+		if (o.data == nullptr || n == 0 || m == 0) return;
+		data = std::make_unique<Type[]>(n * m);
+		for (Type *ptr = o.data.get(), *end = o.data.get() + n * m, *ptrr = data.get(); ptr != end; ++ptr, ++ptrr) *ptrr = *ptr;
+		// std::copy(o.data.get(), o.data.get() + n * m, data.get());
 	}
 	Type* operator[](size_t row) { return data.get() + row * m; }
 	const Type* operator[](size_t row) const { return data.get() + row * m; }
 	Matrix& operator=(const Matrix& o) { 
 		if (this != &o) {
-			if (o.data == nullptr) {
+			if (o.data == nullptr || o.n == 0 || o.m == 0) {
 				n = m = 0; data = nullptr;
 				return *this;
 			}
 			n = o.n; m = o.m; data = std::make_unique<Type[]>(n * m);
-			std::copy(o.data.get(), o.data.get() + n * m, data.get());
+			for (Type *ptr = o.data.get(), *end = o.data.get() + n * m, *ptrr = data.get(); ptr != end; ++ptr, ++ptrr) *ptrr = *ptr;
+			// std::copy(o.data.get(), o.data.get() + n * m, data.get());
 		}
 		return *this;
 	}
