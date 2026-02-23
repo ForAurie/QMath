@@ -1,5 +1,6 @@
 #include <vector>
 #include <complex>
+#include <iostream>
 #include <cmath>
 #include <climits>
 #include <iostream>
@@ -236,19 +237,18 @@ public:
 		Polynomial b = ((*this) % ((this->size() + 1) >> 1)).sqrt();
 		return *this = (*this + b * b) * (b * T(2) % this->size()).inv() % this->size(); 
 	}
-    /////////// 以下未调试
     Polynomial operator|(const Polynomial& o) const {
         if (std::min(this->size(), o.size()) <= 64) {
             if (this->empty() || o.empty()) return Polynomial(0, T(0));
-            Polynomial res(size_t(1) << __log2Ceil(max(this->size(), o.size())), T(0));
+            Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
             for (size_t i = 0; i < this->size(); i++)
                 for (size_t j = 0; j < o.size(); j++)
                     res[i | j] += operator[](i) * o[j];
             return res;
         }
-        const size_t lgn = __log2Ceil(max(this->size(), o.size()));
+        const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
         const size_t n = size_t(1) << lgn;
-        std::vector<T> tmp1(*this), tmp2(o);
+        Polynomial tmp1(*this), tmp2(o);
         tmp1.resize(n, T(0));
         tmp2.resize(n, T(0));
         for (size_t i = 0; i < lgn; i++) {
@@ -267,18 +267,18 @@ public:
         }
         return tmp1;
     }
-    Polynomial& operator|=(const Polynomial& o) const {
+    Polynomial& operator|=(const Polynomial& o) {
         if (std::min(this->size(), o.size()) <= 64) {
             if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
-            Polynomial res(size_t(1) << __log2Ceil(max(this->size(), o.size())), T(0));
+            Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
             for (size_t i = 0; i < this->size(); i++)
                 for (size_t j = 0; j < o.size(); j++)
                     res[i | j] += operator[](i) * o[j];
             return *this = res;
         }
-        const size_t lgn = __log2Ceil(max(this->size(), o.size()));
+        const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
         const size_t n = size_t(1) << lgn;
-        std::vector<T> tmp(o);
+        Polynomial tmp(o);
         this->resize(n, T(0));
         tmp.resize(n, T(0));
         for (size_t i = 0; i < lgn; i++) {
@@ -298,15 +298,15 @@ public:
     Polynomial operator&(const Polynomial& o) const {
         if (std::min(this->size(), o.size()) <= 64) {
             if (this->empty() || o.empty()) return Polynomial(0, T(0));
-            Polynomial res(size_t(1) << __log2Ceil(max(this->size(), o.size())), T(0));
+            Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
             for (size_t i = 0; i < this->size(); i++)
                 for (size_t j = 0; j < o.size(); j++)
                     res[i & j] += operator[](i) * o[j];
             return res;
         }
-        const size_t lgn = __log2Ceil(max(this->size(), o.size()));
+        const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
         const size_t n = size_t(1) << lgn;
-        std::vector<T> tmp1(*this), tmp2(o);
+        Polynomial tmp1(*this), tmp2(o);
         tmp1.resize(n, T(0));
         tmp2.resize(n, T(0));
         for (size_t i = 0; i < lgn; i++) {
@@ -325,18 +325,18 @@ public:
         }
         return tmp1;
     }
-    Polynomial& operator&=(const Polynomial& o) const {
+    Polynomial& operator&=(const Polynomial& o) {
         if (std::min(this->size(), o.size()) <= 64) {
             if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
-            Polynomial res(size_t(1) << __log2Ceil(max(this->size(), o.size())), T(0));
+            Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
             for (size_t i = 0; i < this->size(); i++)
                 for (size_t j = 0; j < o.size(); j++)
                     res[i & j] += operator[](i) * o[j];
             return *this = res;
         }
-        const size_t lgn = __log2Ceil(max(this->size(), o.size()));
+        const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
         const size_t n = size_t(1) << lgn;
-        std::vector<T> tmp(o);
+        Polynomial tmp(o);
         this->resize(n, T(0));
         tmp.resize(n, T(0));
         for (size_t i = 0; i < lgn; i++) {
@@ -355,8 +355,78 @@ public:
         }
         return *this;
     }
-    ////////////////////
-
+    Polynomial operator^(const Polynomial& o) const {
+        if (std::min(this->size(), o.size()) <= 64) {
+            if (this->empty() || o.empty()) return Polynomial(0, T(0));
+            Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+            for (size_t i = 0; i < this->size(); i++)
+                for (size_t j = 0; j < o.size(); j++)
+                    res[i ^ j] += operator[](i) * o[j];
+            return res;
+        }
+        const size_t n = size_t(1) << __log2Ceil(std::max(this->size(), o.size()));
+        Polynomial tmp1(*this), tmp2(o);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = i; j < i + l2; j++) {
+                    tmp1[j] += tmp1[j + l2];
+                    tmp1[j + l2] = tmp1[j] - tmp1[j + l2] - tmp1[j + l2];
+                    tmp2[j] += tmp2[j + l2];
+                    tmp2[j + l2] = tmp2[j] - tmp2[j + l2] - tmp2[j + l2];
+                }
+            }
+        }
+        for (size_t i = 0; i < n; i++) tmp1[i] *= tmp2[i];
+        const T div2 = T(1) / T(2);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = i; j < i + l2; j++) {
+                    tmp1[j] += tmp1[j + l2];
+                    tmp1[j] *= div2;
+                    tmp1[j + l2] = tmp1[j] - tmp1[j + l2];
+                }
+            }
+        }
+        return tmp1;
+    }
+    Polynomial& operator^=(const Polynomial& o) {
+        if (std::min(this->size(), o.size()) <= 64) {
+            if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
+            Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+            for (size_t i = 0; i < this->size(); i++)
+                for (size_t j = 0; j < o.size(); j++)
+                    res[i ^ j] += operator[](i) * o[j];
+            return *this = res;
+        }
+        const size_t n = size_t(1) << __log2Ceil(std::max(this->size(), o.size()));
+        Polynomial tmp(o);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = i; j < i + l2; j++) {
+                    operator[](j) += operator[](j + l2);
+                    operator[](j + l2) = operator[](j) - operator[](j + l2) - operator[](j + l2);
+                    tmp[j] += tmp[j + l2];
+                    tmp[j + l2] = tmp[j] - tmp[j + l2] - tmp[j + l2];
+                }
+            }
+        }
+        for (size_t i = 0; i < n; i++) operator[](i) *= tmp[i];
+        const T div2 = T(1) / T(2);
+        for (size_t l = 2; l <= n; l <<= 1) {
+            const size_t l2 = l >> 1;
+            for (size_t i = 0; i < n; i += l) {
+                for (size_t j = i; j < i + l2; j++) {
+                    operator[](j) += operator[](j + l2);
+                    operator[](j) *= div2;
+                    operator[](j + l2) = operator[](j) - operator[](j + l2);
+                }
+            }
+        }
+        return *this;
+    }
     // template <typename U>
     // Polynomial& fPowSelf(U n) {
     //     Polynomial base(*this);
@@ -499,7 +569,6 @@ public:
 
 // }
 // #endif
-// // #include "Modular"
 // #include <bits/stdc++.h>
 // using namespace std;
 // using Mint = Modular::Modular<int, 998244353, long long>;
@@ -510,16 +579,12 @@ public:
 //     if (x < 0) return Mint(332748118).fPow(998244352 / (-x));
 //     return Mint(3).fPow(998244352 / x);
 // }
-
-// // string s;
-
 // int main() {
-//     ios::sync_with_stdio(false);
-//     cin.tie(nullptr);
-//     // cout.tie(nullptr);
-//     int n, m;
-//     cin >> n >> m;
-//     Polynomial<Mint, Mint, funcTtoNTT, funcNTTtoT, funcNTT> a(n + 1), b(m + 1);
+//     // ios::sync_with_stdio(false);
+//     // cin.tie(nullptr);
+//     int n;
+//     cin >> n;
+//     Polynomial<Mint, Mint, funcTtoNTT, funcNTTtoT, funcNTT> a(1 << n), b(1 << n);
 //     for (auto& x: a) {
 //         int tmp;
 //         cin >> tmp;
@@ -530,10 +595,20 @@ public:
 //         cin >> tmp;
 //         x.setVal(tmp);
 //     }
-//     a *= b;
-//     // a.sqrtSelf();
-//     for (auto& x: a) {
+//     auto r1 = a | b;
+//     auto r2 = a & b;
+//     auto r3 = a ^ b;
+//     for (auto& x: r1) {
 //         cout << x.getVal() << ' ';
 //     }
+//     cout << '\n';
+//     for (auto& x: r2) {
+//         cout << x.getVal() << ' ';
+//     }
+//     cout << '\n';
+//     for (auto& x: r3) {
+//         cout << x.getVal() << ' ';
+//     }
+//     cout << '\n';
 //     return 0;
 // }
