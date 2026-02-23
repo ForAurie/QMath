@@ -57,7 +57,7 @@ QMath 是一个万能的数学库，它打包了和数论、线性代数、多�
     * `Matrix applyFunction(Type (*func)(Type) 或 Type (*func)(const Type&))`：创建一个大小形状相同的结果矩阵，结果矩阵中每个数 $x$ 和其在原矩阵中位置对应的数 $y$ 的关系为：$x=func(y)$，然后返回结果矩阵。
     * `Matrix& applyFunctionSelf(Type (*func)(Type) 或 Type (*func)(const Type&))`：令该矩阵中的每一个数 $x$ 变为 $func(x)$，然后返回自己的引用。
     * `Matrix& resize(size_t n, size_t m, Type x = Type(0))`：先将该矩阵**清空**，再构造一个大小为 $n\times m$，初始值为 $x$ 的矩阵作为该矩阵，然后返回自己的引用。
----
+<!-- ---
 # Function
 
 ## 简介
@@ -122,4 +122,4 @@ $$f(x) = a_0x^0 + a_1x^1+a_2x^2\cdots a_nx^n=\sum\limits_{i=0}^n{a_ix^i}$$
    * `resize()`、`begin()`、`end()`、`front()`、`back()`、`erase()`、`insert()`……：不再一一列举了，用法和 `vector` 完全一样，甚至不影响其配合 STL 使用，例如：
     ```cpp
     sort(p.begin(), p.end());
-    ``` 
+    ```  -->
