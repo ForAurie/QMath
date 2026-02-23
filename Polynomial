@@ -1,3 +1,5 @@
+#ifndef POLYNOMIAL_H
+#define POLYNOMIAL_H
 #include <vector>
 #include <complex>
 #include <cmath>
@@ -613,3 +615,4 @@ namespace Polynomial {
 //     cout << '\n';
 //     return 0;
 // }
+#endif
