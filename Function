@@ -203,12 +203,12 @@ public:
     Polynomial inv() const {
         if (this->size() == 1) return Polynomial(1, T(1) / this->front());
         Polynomial b = ((*this) % ((this->size() + 1) >> 1)).inv();
-        return (b * T(2) - b * b * *this) % this->size();
+        return ((b + b) - b * b * *this) % this->size();
     }
     Polynomial& invSelf() {
         if (this->size() == 1) return *this = Polynomial(1, T(1) / this->front());
         Polynomial b = ((*this) % ((this->size() + 1) >> 1)).inv();
-        return *this = (b * T(2) - b * b * *this) % this->size();
+        return *this = ((b + b) - b * b * *this) % this->size();
     }
     Polynomial ln() const { return (this->derivative() * this->inv()).integralSelf() %= this->size(); }
     Polynomial& lnSelf() {
@@ -218,24 +218,28 @@ public:
         return *this;
     }
     Polynomial exp() const {
+        if (this->empty()) return Polynomial(0, T(0));
         if (this->size() == 1) return Polynomial(1, T(1));
         Polynomial b = ((*this) % ((this->size() + 1) >> 1)).exp();
         return b + b * (*this - (b % this->size()).ln()) % this->size();
     }
     Polynomial& expSelf() {
+        if (this->empty()) return *this = Polynomial(0, T(0));
         if (this->size() == 1) return *this = Polynomial(1, T(1));
         Polynomial b = ((*this) % ((this->size() + 1) >> 1)).exp();
         return *this = b + b * (*this - (b % this->size()).ln()) % this->size();
     }
     Polynomial sqrt() const {
+        if (this->empty()) return Polynomial(0, T(0));
     	if (this->size() == 1) return Polynomial(1, T(1));
     	Polynomial b = ((*this) % ((this->size() + 1) >> 1)).sqrt();
-    	return (*this + b * b) * (b * T(2) % this->size()).inv() % this->size();
+    	return (*this + b * b) * ((b + b) % this->size()).inv() % this->size();
 	}
 	Polynomial& sqrtSelf() {
+        if (this->empty()) return *this = Polynomial(0, T(0));
 		if (this->size() == 1) return *this = Polynomial(1, T(1));
 		Polynomial b = ((*this) % ((this->size() + 1) >> 1)).sqrt();
-		return *this = (*this + b * b) * (b * T(2) % this->size()).inv() % this->size(); 
+		return *this = (*this + b * b) * ((b + b) % this->size()).inv() % this->size(); 
 	}
     Polynomial operator|(const Polynomial& o) const {
         if (std::min(this->size(), o.size()) <= 64) {
