@@ -251,6 +251,32 @@ namespace Polynomial {
             }
             const size_t n = size_t(1) << log2Ceil(this->size() + o.size() - 1);
             ensure_precomputed(n);
+            if (this == &o) {
+                if constexpr (std::is_same<TFFT, T>::value) {
+                    const size_t len = this->size() + o.size() - 1;
+                    this->resize(n, T(0));
+                    DFT(*this);
+                    for (auto& i : *this) i *= i;
+                    IDFT(*this);
+                    this->resize(len);
+                    const TFFT div = TFFT(1) / TFFT(n);
+                    for (auto& i : *this) i *= div;
+                    return *this;
+                } else { // 该部分未测试，理论上应该没问题
+                    std::vector<TFFT> a(n);
+                    {
+                        auto j = a.begin();
+                        for (auto i = this->begin(); i != this->end(); ++i, ++j) (*j) = T2TFFT(*i);
+                    }
+                    DFT(a);
+                    for (auto& i : a) i *= i;
+                    IDFT(a);
+                    this->resize(this->size() + o.size() - 1, T(0));
+                    const TFFT div = TFFT(1) / TFFT(n);
+                    for (size_t i = 0; i < this->size(); i++) operator[](i) = TFFT2T(a[i] * div);
+                    return *this;
+                }
+            }
             if constexpr (std::is_same<TFFT, std::complex<T>>::value) {
                 std::vector<std::complex<T>> a(n);
                 {
@@ -302,7 +328,8 @@ namespace Polynomial {
         }
         Polynomial operator*(const Polynomial& o) const {
             Polynomial res(*this);
-            return res *= o;
+            if (this == &o) return res *= res;
+            else return res *= o;
         }
         Polynomial operator%(size_t n) const {
             Polynomial res(*this);
@@ -314,21 +341,30 @@ namespace Polynomial {
             return *this;
         }
         Polynomial inv() const {
-            if (this->size() == 1) return Polynomial(1, T(1) / this->front());
-            Polynomial b = ((*this) % ((this->size() + 1) >> 1)).inv();
-            return ((b + b) - b * b * *this) % this->size();
+            Polynomial res(1, T(1) / this->front());
+            Polynomial tmp(1, this->front());
+            while (res.size() < this->size()) {
+                tmp.resize(std::min(this->size(), res.size() << 1), T(0));
+                for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
+                (res += res - res * res * tmp) %= (res.size() << 1);
+            }
+            return res % this->size();
         }
         Polynomial& invSelf() {
-            if (this->size() == 1) return *this = Polynomial(1, T(1) / this->front());
-            Polynomial b = ((*this) % ((this->size() + 1) >> 1)).inv();
-            return *this = ((b + b) - b * b * *this) % this->size();
+            Polynomial res(1, T(1) / this->front());
+            Polynomial tmp(1, this->front());
+            while (res.size() < this->size()) {
+                tmp.resize(std::min(this->size(), res.size() << 1), T(0));
+                for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
+                (res += res - res * res * tmp) %= (res.size() << 1);
+            }
+            return *this = res % this->size();
         }
         Polynomial ln() const { return (this->derivative() * this->inv()).integralSelf() %= this->size(); }
         Polynomial& lnSelf() {
             size_t n = this->size();
             *this = this->derivative() * this->inv();
-            this->integralSelf() %= n;
-            return *this;
+            return this->integralSelf() %= n;
         }
         Polynomial exp() const {
             if (this->empty()) return Polynomial(0, T(0));
@@ -556,318 +592,318 @@ namespace Polynomial {
 }
 /////////////////////////////////////////////
 
-// #ifndef MODULAR_H
-// #define MODULAR_H
-// namespace Modular {
-//     template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
-//     class Modular {
-//     private:
-//         T value;
-//         // T exgcd(const T& a, const T& b, T& x, T& y) const {
-//         //     if (b == 0) {
-//         //         x = 1, y = 0;
-//         //         return a;
-//         //     }
-//         //     T g = exgcd(b, a % b, y, x);
-//         //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
-//         //     if (y < 0) y += MOD;
-//         //     if (y >= MOD) y -= MOD;
-//         //     return g;
-//         // }
-//     public:
-//         constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
-//         constexpr Modular(const Modular& other) : value(other.value) {}
-//         Modular& operator=(const Modular& other) { value = other.value; return *this; }
-//         Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
+#ifndef MODULAR_H
+#define MODULAR_H
+namespace Modular {
+    template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
+    class Modular {
+    private:
+        T value;
+        // T exgcd(const T& a, const T& b, T& x, T& y) const {
+        //     if (b == 0) {
+        //         x = 1, y = 0;
+        //         return a;
+        //     }
+        //     T g = exgcd(b, a % b, y, x);
+        //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
+        //     if (y < 0) y += MOD;
+        //     if (y >= MOD) y -= MOD;
+        //     return g;
+        // }
+    public:
+        constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
+        constexpr Modular(const Modular& other) : value(other.value) {}
+        Modular& operator=(const Modular& other) { value = other.value; return *this; }
+        Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
         
-//         T getVal() const { return value; }
-//         Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
+        T getVal() const { return value; }
+        Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
 
-//         Modular operator-() const {
-//             Modular res(*this);
-//             if (res.value != T(0)) res.value = MOD - res.value;
-//             return res;
-//         }
-//         friend Modular operator+(const Modular& a, const Modular& b) { 
-//             Modular res(a);
-//             if ((res.value += b.value) >= MOD) res.value -= MOD;
-//             return res;
-//         }
-//         friend Modular operator-(const Modular& a, const Modular& b) { 
-//             Modular res(a);
-//             if ((res.value -= b.value) < T(0)) res.value += MOD;
-//             return res;
-//         }
-//         friend Modular operator*(const Modular& a, const Modular& b) { return Modular((MCT) a.value * (MCT) b.value % MOD); }
-//         Modular& operator+=(const Modular& other) { 
-//             if ((value += other.value) >= MOD) value -= MOD;
-//             return *this; 
-//         }
-//         Modular& operator-=(const Modular& other) { 
-//             if ((value -= other.value) < 0) { value += MOD; } 
-//             return *this; 
-//         }
-//         Modular& operator*=(const Modular& other) { 
-//             value = (MCT) value * (MCT) other.value % MOD; 
-//             return *this; 
-//         }
-//         template <typename U>
-//         Modular fPow(U exp) const {
-//             Modular result(1);
-//             T base = value;
-//             while (exp) {
-//                 if (exp & 1) result.value = (MCT) result.value * (MCT) base % MOD;
-//                 base = (MCT) base * (MCT) base % MOD;
-//                 exp >>= 1;
-//             }
-//             return result;
-//         }
-//         template <typename U>
-//         Modular& fPowSelf(U exp) {
-//             T base = value;
-//             value = 1;
-//             while (exp) {
-//                 if (exp & 1) value = (MCT) value * (MCT) base % MOD;
-//                 base = (MCT) base * (MCT) base % MOD;
-//                 exp >>= 1;
-//             }
-//             return *this;
-//         }
-//         Modular inv() const {
-//             return fPow(MOD - 2);
-//             // T x, y;
-//             // T g = exgcd(value, MOD, x, y);
-//             // assert(g == 1);
-//             // return Modular(x);
-//         }
-//         Modular& invSelf() {
-//             return fPowSelf(MOD - 2);
-//             // T x, y;
-//             // T g = exgcd(value, MOD, x, y);
-//             // assert(g == 1); 
-//             // value = x;
-//             // return *this;
-//         }
-//         // 除法运算
-//         friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
-//         Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
-//         // 比较运算
-//         friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
-//         friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
-//         friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
-//         friend std::istream& operator>>(std::istream& is, Modular& m) { 
-//             T v; 
-//             is >> v; 
-//             m.setVal(v); 
-//             return is; 
-//         }
-//     };
-// }
-// #endif
-// #include <cstdio>
-// #include <cstddef>
-// #include <cctype>
-// #include <type_traits>
-// #include <string>
-// template<size_t BUF_SIZE>
-// class FastIO {
-// private:
-//     char outdata[BUF_SIZE], indata[BUF_SIZE];
-//     size_t n, outidx, inidx;
-//     FILE* inFile;
-//     FILE* outFile;
-//     // int floatPrecision = 6;
-//     // bool useScientific = true;
-// public:
-//     FastIO(FILE* in = stdin, FILE* out = stdout) : n(0), outidx(0), inidx(0), inFile(in), outFile(out) {}
+        Modular operator-() const {
+            Modular res(*this);
+            if (res.value != T(0)) res.value = MOD - res.value;
+            return res;
+        }
+        friend Modular operator+(const Modular& a, const Modular& b) { 
+            Modular res(a);
+            if ((res.value += b.value) >= MOD) res.value -= MOD;
+            return res;
+        }
+        friend Modular operator-(const Modular& a, const Modular& b) { 
+            Modular res(a);
+            if ((res.value -= b.value) < T(0)) res.value += MOD;
+            return res;
+        }
+        friend Modular operator*(const Modular& a, const Modular& b) { return Modular((MCT) a.value * (MCT) b.value % MOD); }
+        Modular& operator+=(const Modular& other) { 
+            if ((value += other.value) >= MOD) value -= MOD;
+            return *this; 
+        }
+        Modular& operator-=(const Modular& other) { 
+            if ((value -= other.value) < 0) { value += MOD; } 
+            return *this; 
+        }
+        Modular& operator*=(const Modular& other) { 
+            value = (MCT) value * (MCT) other.value % MOD; 
+            return *this; 
+        }
+        template <typename U>
+        Modular fPow(U exp) const {
+            Modular result(1);
+            T base = value;
+            while (exp) {
+                if (exp & 1) result.value = (MCT) result.value * (MCT) base % MOD;
+                base = (MCT) base * (MCT) base % MOD;
+                exp >>= 1;
+            }
+            return result;
+        }
+        template <typename U>
+        Modular& fPowSelf(U exp) {
+            T base = value;
+            value = 1;
+            while (exp) {
+                if (exp & 1) value = (MCT) value * (MCT) base % MOD;
+                base = (MCT) base * (MCT) base % MOD;
+                exp >>= 1;
+            }
+            return *this;
+        }
+        Modular inv() const {
+            return fPow(MOD - 2);
+            // T x, y;
+            // T g = exgcd(value, MOD, x, y);
+            // assert(g == 1);
+            // return Modular(x);
+        }
+        Modular& invSelf() {
+            return fPowSelf(MOD - 2);
+            // T x, y;
+            // T g = exgcd(value, MOD, x, y);
+            // assert(g == 1); 
+            // value = x;
+            // return *this;
+        }
+        // 除法运算
+        friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
+        Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
+        // 比较运算
+        friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
+        friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
+        friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
+        friend std::istream& operator>>(std::istream& is, Modular& m) { 
+            T v; 
+            is >> v; 
+            m.setVal(v); 
+            return is; 
+        }
+    };
+}
+#endif
+#include <cstdio>
+#include <cstddef>
+#include <cctype>
+#include <type_traits>
+#include <string>
+template<size_t BUF_SIZE>
+class FastIO {
+private:
+    char outdata[BUF_SIZE], indata[BUF_SIZE];
+    size_t n, outidx, inidx;
+    FILE* inFile;
+    FILE* outFile;
+    // int floatPrecision = 6;
+    // bool useScientific = true;
+public:
+    FastIO(FILE* in = stdin, FILE* out = stdout) : n(0), outidx(0), inidx(0), inFile(in), outFile(out) {}
 
-//     // inline void setPrecision(int p) { floatPrecision = p; }
-//     // inline void setScientific(bool enable) { useScientific = enable; }
+    // inline void setPrecision(int p) { floatPrecision = p; }
+    // inline void setScientific(bool enable) { useScientific = enable; }
 
-//     inline void putchar(char c) {
-//         outdata[outidx++] = c;
-//         if (outidx == BUF_SIZE) {
-//             std::fwrite(outdata, 1, BUF_SIZE, outFile);
-//             outidx = 0;
-//         }
-//     }
-//     inline void flush() { if (outidx) std::fwrite(outdata, 1, outidx, outFile), outidx = 0; }
-//     inline char getchar() {
-//         if (inidx >= n) {
-//             n = std::fread(indata, 1, BUF_SIZE, inFile);
-//             inidx = 0;
-//             if (n == 0) return -1;
-//         }
-//         return indata[inidx++];
-//     }
-//     template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-//     inline FastIO& operator<<(T x) {
-//         static char s[40];
-//         if (x < 0) putchar('-'), x = -x;
-//         int n = 0;
-//         do s[n++] = x % 10 | 0x30, x /= 10;
-//         while (x);
-//         while (n--) putchar(s[n]);
-//         return *this;
-//     }
-//     template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-//     inline FastIO& operator>>(T& x) {
-//         x = 0;
-//         char ch = getchar();
-//         bool flag = false;
-//         while (!std::isdigit(ch)) {
-//             if (ch == '-') flag = true;
-//             ch = getchar();
-//         }
-//         while (std::isdigit(ch)) {
-//             x = (x << 3) + (x << 1) + (ch ^ 0x30);
-//             ch = getchar();
-//         }
-//         if (flag) x = -x;
-//         return *this;
-//     }
-//     template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-//     inline FastIO& operator>>(T& x) {
-//         x = 0;
-//         bool neg = false;
-//         char ch = getchar();
-//         while (!std::isdigit(ch) && ch != '.') {
-//             if (ch == '-') neg = true;
-//             ch = getchar();
-//         }
-//         while (std::isdigit(ch)) {
-//             x = x * 10 + (ch ^ 0x30);
-//             ch = getchar();
-//         }
-//         if (ch == '.') {
-//             ch = getchar();
-//             T div = static_cast<T>(1);
-//             while (isdigit(ch)) {
-//                 div /= 10;
-//                 x += (ch ^ 0x30) * div;
-//                 ch = getchar();
-//             }
-//         }
-//         if (neg) x = -x;
-//         if (ch == 'E' || ch == 'e') {
-//             ch = getchar();
-//             neg = false;
-//             if (ch == '+') {
-//                 ch = getchar();
-//             } else if (ch == '-') {
-//                 neg = true;
-//                 ch = getchar();
-//             }
-//             int exp = 0;
-//             while (isdigit(ch)) {
-//                 exp = (exp << 3) + (exp << 1) + (ch ^ 0x30);
-//                 ch = getchar();
-//             }
-//             T base = 10;
-//             if (neg) {
-//                 while (exp) {
-//                     if (exp & 1) x /= base;
-//                     base *= base;
-//                     exp >>= 1;
-//                 }
-//             } else {
-//                 while (exp) {
-//                     if (exp & 1) x *= base;
-//                     base *= base;
-//                     exp >>= 1;
-//                 }
-//             }
-//         }
-//         return *this;
-//     }
-//     // template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-//     // inline FastIO& operator<<(T x) {
-//     //     if (std::isnan(x)) return putchar('n'), putchar('a'), putchar('n'), *this;
-//     //     if (std::isinf(x)) {
-//     //         if (x < 0) putchar('-');
-//     //         putchar('i'), putchar('n'), putchar('f');
-//     //         return *this;
-//     //     }
-//     //     if (x < 0) {
-//     //         putchar('-');
-//     //         x = -x;
-//     //     }
-//     //     int exp10 = 0;
-//     //     if (useScientific && (x != 0.0) && (x < 1e-4 || x >= 1e6)) {
-//     //         exp10 = static_cast<int>(std::floor(std::log10(x)));
-//     //         x /= std::pow(10.0, exp10);
-//     //     }
-//     //     T intPart;
-//     //     T fracPart = std::modf(x, &intPart);
-//     //     static char buf[1024];
-//     //     int n = 0;
-//     //     if (intPart < 1) buf[n++] = '0';
-//     //     else {
-//     //         while (intPart >= 1) {
-//     //             T tmp = std::floor(std::fmod(intPart, 10));
-//     //             buf[n++] = static_cast<int>(tmp + 1e-4) | 0x30;
-//     //             intPart = std::floor(intPart / 10);
-//     //         }
-//     //     }
-//     //     while (n--) putchar(buf[n]);
-//     //     if (floatPrecision > 0) {
-//     //         putchar('.');
-//     //         for (int i = 0; i < floatPrecision; ++i) {
-//     //             fracPart *= 10;
-//     //             int digit = fracPart + 1e-4;
-//     //             buf[fracLen++] =  | 0x30;
-//     //             fracPart -= digit;
-//     //         }
-//     //         // // 去除尾随0
-//     //         // while (fracLen > 0 && fracBuf[fracLen - 1] == '0') fracLen--;
-//     //         // for (int i = 0; i < fracLen; ++i) putchar(fracBuf[i]);
-//     //     }
-//     //     if (exp10 != 0) {
-//     //         putchar('e');
-//     //         if (exp10 < 0) putchar('-'), exp10 = -exp10;
-//     //         static char expBuf[8];
-//     //         int n = 0;
-//     //         do expBuf[n++] = exp10 % 10 | 0x30, exp10 /= 10;
-//     //         while (exp10);
-//     //         while (n--) putchar(expBuf[n]);
-//     //     }
-//     //     return *this;
-//     // }
-//     inline FastIO& operator<<(char ch) { putchar(ch); return *this; }
-//     inline FastIO& operator>>(char& ch) {
-//         ch = getchar();
-//         while(!std::isgraph(ch)) ch = getchar();
-//         return *this;
-//     }
-//     inline FastIO& operator<<(const std::string& s) {
-//         for (const auto& i : s) putchar(i);
-//         return *this;
-//     }
-//     inline FastIO& operator>>(std::string& s) {
-//         char ch = getchar();
-//         while(!std::isgraph(ch)) ch = getchar();
-//         s.clear();
-//         do s.push_back(ch), ch = getchar();
-//         while (std::isgraph(ch));
-//         return *this;
-//     }
-//     ~FastIO() {
-//         flush();
-//     }
-// };
-// #include <bits/stdc++.h>
-// FastIO<(1 << 20) * 4> __IOER__;
-// #define cin __IOER__
-// #define cout __IOER__
-// #define getchar __IOER__.getchar
-// #define putchar __IOER__.putchar
-// #define fflush(stdout) __IOER__.flush()
-// #define endl '\n'
-// using namespace std;
-// // using Mint = Modular::Modular<int, 998244353, unsigned long long>;
-// // inline Mint funcT2TNTT(Mint x) { return x; }
-// // inline Mint funcTNTT2T(Mint x) { return x; }
-// // inline Mint funcNTT(size_t x) { return Mint(3).fPow(998244352 / x); } // 332748118
+    inline void putchar(char c) {
+        outdata[outidx++] = c;
+        if (outidx == BUF_SIZE) {
+            std::fwrite(outdata, 1, BUF_SIZE, outFile);
+            outidx = 0;
+        }
+    }
+    inline void flush() { if (outidx) std::fwrite(outdata, 1, outidx, outFile), outidx = 0; }
+    inline char getchar() {
+        if (inidx >= n) {
+            n = std::fread(indata, 1, BUF_SIZE, inFile);
+            inidx = 0;
+            if (n == 0) return -1;
+        }
+        return indata[inidx++];
+    }
+    template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+    inline FastIO& operator<<(T x) {
+        static char s[40];
+        if (x < 0) putchar('-'), x = -x;
+        int n = 0;
+        do s[n++] = x % 10 | 0x30, x /= 10;
+        while (x);
+        while (n--) putchar(s[n]);
+        return *this;
+    }
+    template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+    inline FastIO& operator>>(T& x) {
+        x = 0;
+        char ch = getchar();
+        bool flag = false;
+        while (!std::isdigit(ch)) {
+            if (ch == '-') flag = true;
+            ch = getchar();
+        }
+        while (std::isdigit(ch)) {
+            x = (x << 3) + (x << 1) + (ch ^ 0x30);
+            ch = getchar();
+        }
+        if (flag) x = -x;
+        return *this;
+    }
+    template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+    inline FastIO& operator>>(T& x) {
+        x = 0;
+        bool neg = false;
+        char ch = getchar();
+        while (!std::isdigit(ch) && ch != '.') {
+            if (ch == '-') neg = true;
+            ch = getchar();
+        }
+        while (std::isdigit(ch)) {
+            x = x * 10 + (ch ^ 0x30);
+            ch = getchar();
+        }
+        if (ch == '.') {
+            ch = getchar();
+            T div = static_cast<T>(1);
+            while (isdigit(ch)) {
+                div /= 10;
+                x += (ch ^ 0x30) * div;
+                ch = getchar();
+            }
+        }
+        if (neg) x = -x;
+        if (ch == 'E' || ch == 'e') {
+            ch = getchar();
+            neg = false;
+            if (ch == '+') {
+                ch = getchar();
+            } else if (ch == '-') {
+                neg = true;
+                ch = getchar();
+            }
+            int exp = 0;
+            while (isdigit(ch)) {
+                exp = (exp << 3) + (exp << 1) + (ch ^ 0x30);
+                ch = getchar();
+            }
+            T base = 10;
+            if (neg) {
+                while (exp) {
+                    if (exp & 1) x /= base;
+                    base *= base;
+                    exp >>= 1;
+                }
+            } else {
+                while (exp) {
+                    if (exp & 1) x *= base;
+                    base *= base;
+                    exp >>= 1;
+                }
+            }
+        }
+        return *this;
+    }
+    // template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
+    // inline FastIO& operator<<(T x) {
+    //     if (std::isnan(x)) return putchar('n'), putchar('a'), putchar('n'), *this;
+    //     if (std::isinf(x)) {
+    //         if (x < 0) putchar('-');
+    //         putchar('i'), putchar('n'), putchar('f');
+    //         return *this;
+    //     }
+    //     if (x < 0) {
+    //         putchar('-');
+    //         x = -x;
+    //     }
+    //     int exp10 = 0;
+    //     if (useScientific && (x != 0.0) && (x < 1e-4 || x >= 1e6)) {
+    //         exp10 = static_cast<int>(std::floor(std::log10(x)));
+    //         x /= std::pow(10.0, exp10);
+    //     }
+    //     T intPart;
+    //     T fracPart = std::modf(x, &intPart);
+    //     static char buf[1024];
+    //     int n = 0;
+    //     if (intPart < 1) buf[n++] = '0';
+    //     else {
+    //         while (intPart >= 1) {
+    //             T tmp = std::floor(std::fmod(intPart, 10));
+    //             buf[n++] = static_cast<int>(tmp + 1e-4) | 0x30;
+    //             intPart = std::floor(intPart / 10);
+    //         }
+    //     }
+    //     while (n--) putchar(buf[n]);
+    //     if (floatPrecision > 0) {
+    //         putchar('.');
+    //         for (int i = 0; i < floatPrecision; ++i) {
+    //             fracPart *= 10;
+    //             int digit = fracPart + 1e-4;
+    //             buf[fracLen++] =  | 0x30;
+    //             fracPart -= digit;
+    //         }
+    //         // // 去除尾随0
+    //         // while (fracLen > 0 && fracBuf[fracLen - 1] == '0') fracLen--;
+    //         // for (int i = 0; i < fracLen; ++i) putchar(fracBuf[i]);
+    //     }
+    //     if (exp10 != 0) {
+    //         putchar('e');
+    //         if (exp10 < 0) putchar('-'), exp10 = -exp10;
+    //         static char expBuf[8];
+    //         int n = 0;
+    //         do expBuf[n++] = exp10 % 10 | 0x30, exp10 /= 10;
+    //         while (exp10);
+    //         while (n--) putchar(expBuf[n]);
+    //     }
+    //     return *this;
+    // }
+    inline FastIO& operator<<(char ch) { putchar(ch); return *this; }
+    inline FastIO& operator>>(char& ch) {
+        ch = getchar();
+        while(!std::isgraph(ch)) ch = getchar();
+        return *this;
+    }
+    inline FastIO& operator<<(const std::string& s) {
+        for (const auto& i : s) putchar(i);
+        return *this;
+    }
+    inline FastIO& operator>>(std::string& s) {
+        char ch = getchar();
+        while(!std::isgraph(ch)) ch = getchar();
+        s.clear();
+        do s.push_back(ch), ch = getchar();
+        while (std::isgraph(ch));
+        return *this;
+    }
+    ~FastIO() {
+        flush();
+    }
+};
+#include <bits/stdc++.h>
+FastIO<(1 << 20) * 4> __IOER__;
+#define cin __IOER__
+#define cout __IOER__
+#define getchar __IOER__.getchar
+#define putchar __IOER__.putchar
+#define fflush(stdout) __IOER__.flush()
+#define endl '\n'
+using namespace std;
+using Mint = Modular::Modular<int, 998244353, unsigned long long>;
+inline Mint funcT2TNTT(Mint x) { return x; }
+inline Mint funcTNTT2T(Mint x) { return x; }
+inline Mint funcNTT(size_t x) { return Mint(3).fPow(998244352 / x); } // 332748118
 // int main() {
 //     // ios::sync_with_stdio(false);
 //     // cin.tie(nullptr);
@@ -884,17 +920,17 @@ namespace Polynomial {
 //         cout << (int) (x + 0.5) << ' ';
 //     return 0;
 // }
-// // int main() {
-// //     ios::sync_with_stdio(false);
-// //     cin.tie(nullptr);
-// //     int n;
-// //     cin >> n;
-// //     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n);
-// //     for (auto& x: a)
-// //         cin >> x;
-// //     a.expSelf();
-// //     for (auto& x : a)
-// //         cout << x << ' ';
-// //     return 0;
-// // }
+int main() {
+    // ios::sync_with_stdio(false);
+    // cin.tie(nullptr);
+    int n, tmp;
+    cin >> n;
+    Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n);
+    for (auto& x: a)
+        cin >> tmp, x.setVal(tmp);
+    a.invSelf();
+    for (auto& x : a)
+        cout << x.getVal() << ' ';
+    return 0;
+}
 #endif
