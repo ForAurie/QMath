@@ -110,14 +110,8 @@ namespace Polynomial {
              >
     class Polynomial:public std::vector<T> {
     private:
-        static std::vector<TFFT>& get_unit_roots() {
-            thread_local static std::vector<TFFT> unitRoots = {TFFT(1)};
-            return unitRoots;
-        }
-        static size_t& get_root_size() {
-            thread_local static size_t sz = 1;
-            return sz;
-        }
+        static std::vector<TFFT>& get_unit_roots() { thread_local static std::vector<TFFT> unitRoots = {TFFT(1)}; return unitRoots; }
+        static size_t& get_root_size() { thread_local static size_t sz = 1; return sz; }
         static void ensure_precomputed(size_t n) {
             auto& unitRoots = get_unit_roots();
             auto& sz = get_root_size();
@@ -132,26 +126,22 @@ namespace Polynomial {
         }
         inline void DFT(std::vector<TFFT>& a) {
             auto& unitRoots = get_unit_roots();
-            for(size_t l2 = a.size() >> 1; l2; l2 >>= 1) {
-                for(auto i = a.begin(), ww = unitRoots.begin(); i != a.end(); i += l2 << 1, ++ww) {
+            for(size_t l2 = a.size() >> 1; l2; l2 >>= 1)
+                for(auto i = a.begin(), ww = unitRoots.begin(); i != a.end(); i += l2 << 1, ++ww)
                     for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
                         auto &u = *uu, &v = *vv, &w = *ww;
                         std::tie(u, v) = std::pair{u + v * w, u - v * w};
                     }
-                }
-            }
         }
         inline void IDFT(std::vector<TFFT>& a) {
             auto& unitRoots = get_unit_roots();
-            for(size_t l2 = 1; l2 < a.size(); l2 <<= 1) {
-                for(auto i = a.begin(), ww = unitRoots.begin(); i != a.end(); i += l2 << 1, ++ww) {
+            for(size_t l2 = 1; l2 < a.size(); l2 <<= 1)
+                for(auto i = a.begin(), ww = unitRoots.begin(); i != a.end(); i += l2 << 1, ++ww)
                     for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
                         auto &u = *uu, &v = *vv, &w = *ww;
                         std::tie(u, v) = std::pair{u + v, (u - v) * w};
                     }
-                }
-            }
-            reverse(a.begin() + 1, a.end());
+            std::reverse(a.begin() + 1, a.end());
         }
     public:
         static void init() {
