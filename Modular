@@ -5,17 +5,6 @@ namespace Modular {
     class Modular {
     private:
         T value;
-        // T exgcd(const T& a, const T& b, T& x, T& y) const {
-        //     if (b == 0) {
-        //         x = 1, y = 0;
-        //         return a;
-        //     }
-        //     T g = exgcd(b, a % b, y, x);
-        //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
-        //     if (y < 0) y += MOD;
-        //     if (y >= MOD) y -= MOD;
-        //     return g;
-        // }
     public:
         constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
         constexpr Modular(const Modular& other) : value(other.value) {}
@@ -75,25 +64,11 @@ namespace Modular {
             }
             return *this;
         }
-        Modular inv() const {
-            return fPow(MOD - 2);
-            // T x, y;
-            // T g = exgcd(value, MOD, x, y);
-            // assert(g == 1);
-            // return Modular(x);
-        }
-        Modular& invSelf() {
-            return fPowSelf(MOD - 2);
-            // T x, y;
-            // T g = exgcd(value, MOD, x, y);
-            // assert(g == 1); 
-            // value = x;
-            // return *this;
-        }
-        // 除法运算
+        Modular inv() const { return fPow(MOD - 2); }
+        Modular& invSelf() { return fPowSelf(MOD - 2); }
         friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
         Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
-        // 比较运算
+
         friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
         friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
         friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
