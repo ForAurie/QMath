@@ -10,11 +10,52 @@
 #include <mutex>
 #include <type_traits>
 
+#include <cstddef>
+#include <cstdint>
+
+// 尝试使用 C++20 标准库 (最推荐，如果编译器支持)
+#if defined(__cplusplus) && __cplusplus >= 202002L
+#include <bit>
 namespace Polynomial {
-    inline int __log2Floor(size_t n) { return (sizeof(n) * 8 - 1) - __builtin_clzll(n); }
-    inline int __log2Ceil(size_t n) {
+    inline int log2Floor(size_t n) { return static_cast<int>(std::bit_width(n)) - 1; }
+}
+// MSVC (Windows)
+#elif defined(_MSC_VER)
+#include <intrin.h>
+#pragma intrinsic(_BitScanReverse64)
+#pragma intrinsic(_BitScanReverse)
+namespace Polynomial {
+    inline int log2Floor(size_t n) {
+        unsigned long index;
+        if constexpr (sizeof(size_t) == 8) {
+            if (_BitScanReverse64(&index, static_cast<unsigned __int64>(n))) return static_cast<int>(index);
+        } else {
+            if (_BitScanReverse(&index, static_cast<unsigned long>(n))) return static_cast<int>(index);
+        }
+        return -1; 
+    }
+}
+// GCC / Clang / ICC (原有逻辑保留)
+#elif defined(__GNUC__) || defined(__clang__)
+namespace Polynomial {
+    inline int log2Floor(size_t n) { return (static_cast<int>(sizeof(n) * 8) - 1) - __builtin_clzll(static_cast<unsigned long long>(n)); }
+}
+// 其他未知编译器的纯 C++ 回退方案 (Portable Fallback)
+#else
+namespace Polynomial {
+    inline int log2Floor(size_t n) {
+        if (n == 0) return -1;
+        int log = 0;
+        while (n >>= 1) ++log;
+        return log;
+    }
+}
+#endif
+
+namespace Polynomial {
+    inline int log2Ceil(size_t n) {
         if (n == 1) return 0;
-        return __log2Floor(n - 1) + 1;
+        return log2Floor(n - 1) + 1;
     }
 
     constexpr double PI2 = 6.283185307179586476925286766559005768394338798750211641949889;
@@ -211,12 +252,14 @@ namespace Polynomial {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
                 Polynomial res(this->size() + o.size() - 1, T(0));
-                for (size_t i = 0; i < this->size(); i++)
-                    for (size_t j = 0; j < o.size(); j++)
-                        res[i + j] += operator[](i) * o[j];
+                auto p = res.begin();
+                for (auto i = this->begin(); i != this->end(); ++i, ++p) {
+                    auto k = p;
+                    for (auto j = o.begin(); j != o.end(); ++j, ++k) (*k) += (*i) * (*j);
+                }
                 return *this = res;
             }
-            const size_t n = size_t(1) << __log2Ceil(this->size() + o.size() - 1);
+            const size_t n = size_t(1) << log2Ceil(this->size() + o.size() - 1);
             ensure_precomputed(n);
             if constexpr (std::is_same<T, TFFT>::value) {
                 const size_t len = this->size() + o.size() - 1;
@@ -305,13 +348,13 @@ namespace Polynomial {
         Polynomial operator|(const Polynomial& o) const {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return Polynomial(0, T(0));
-                Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+                Polynomial res(size_t(1) << log2Ceil(std::max(this->size(), o.size())), T(0));
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i | j] += operator[](i) * o[j];
                 return res;
             }
-            const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
+            const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
             Polynomial tmp1(*this), tmp2(o);
             tmp1.resize(n, T(0));
@@ -335,13 +378,13 @@ namespace Polynomial {
         Polynomial& operator|=(const Polynomial& o) {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
-                Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+                Polynomial res(size_t(1) << log2Ceil(std::max(this->size(), o.size())), T(0));
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i | j] += operator[](i) * o[j];
                 return *this = res;
             }
-            const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
+            const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
             Polynomial tmp(o);
             this->resize(n, T(0));
@@ -363,13 +406,13 @@ namespace Polynomial {
         Polynomial operator&(const Polynomial& o) const {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return Polynomial(0, T(0));
-                Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+                Polynomial res(size_t(1) << log2Ceil(std::max(this->size(), o.size())), T(0));
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i & j] += operator[](i) * o[j];
                 return res;
             }
-            const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
+            const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
             Polynomial tmp1(*this), tmp2(o);
             tmp1.resize(n, T(0));
@@ -393,13 +436,13 @@ namespace Polynomial {
         Polynomial& operator&=(const Polynomial& o) {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
-                Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+                Polynomial res(size_t(1) << log2Ceil(std::max(this->size(), o.size())), T(0));
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i & j] += operator[](i) * o[j];
                 return *this = res;
             }
-            const size_t lgn = __log2Ceil(std::max(this->size(), o.size()));
+            const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
             Polynomial tmp(o);
             this->resize(n, T(0));
@@ -423,13 +466,13 @@ namespace Polynomial {
         Polynomial operator^(const Polynomial& o) const {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return Polynomial(0, T(0));
-                Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+                Polynomial res(size_t(1) << log2Ceil(std::max(this->size(), o.size())), T(0));
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i ^ j] += operator[](i) * o[j];
                 return res;
             }
-            const size_t n = size_t(1) << __log2Ceil(std::max(this->size(), o.size()));
+            const size_t n = size_t(1) << log2Ceil(std::max(this->size(), o.size()));
             Polynomial tmp1(*this), tmp2(o);
             for (size_t l = 2; l <= n; l <<= 1) {
                 const size_t l2 = l >> 1;
@@ -459,13 +502,13 @@ namespace Polynomial {
         Polynomial& operator^=(const Polynomial& o) {
             if (std::min(this->size(), o.size()) <= 64) {
                 if (this->empty() || o.empty()) return *this = Polynomial(0, T(0));
-                Polynomial res(size_t(1) << __log2Ceil(std::max(this->size(), o.size())), T(0));
+                Polynomial res(size_t(1) << log2Ceil(std::max(this->size(), o.size())), T(0));
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i ^ j] += operator[](i) * o[j];
                 return *this = res;
             }
-            const size_t n = size_t(1) << __log2Ceil(std::max(this->size(), o.size()));
+            const size_t n = size_t(1) << log2Ceil(std::max(this->size(), o.size()));
             Polynomial tmp(o);
             for (size_t l = 2; l <= n; l <<= 1) {
                 const size_t l2 = l >> 1;
@@ -504,147 +547,147 @@ namespace Polynomial {
 }
 /////////////////////////////////////////////
 
-#ifndef MODULAR_H
-#define MODULAR_H
-namespace Modular {
-    template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
-    class Modular {
-    private:
-        T value;
-        // T exgcd(const T& a, const T& b, T& x, T& y) const {
-        //     if (b == 0) {
-        //         x = 1, y = 0;
-        //         return a;
-        //     }
-        //     T g = exgcd(b, a % b, y, x);
-        //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
-        //     if (y < 0) y += MOD;
-        //     if (y >= MOD) y -= MOD;
-        //     return g;
-        // }
-    public:
-        constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
-        constexpr Modular(const Modular& other) : value(other.value) {}
-        Modular& operator=(const Modular& other) { value = other.value; return *this; }
-        Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
+// #ifndef MODULAR_H
+// #define MODULAR_H
+// namespace Modular {
+//     template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
+//     class Modular {
+//     private:
+//         T value;
+//         // T exgcd(const T& a, const T& b, T& x, T& y) const {
+//         //     if (b == 0) {
+//         //         x = 1, y = 0;
+//         //         return a;
+//         //     }
+//         //     T g = exgcd(b, a % b, y, x);
+//         //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
+//         //     if (y < 0) y += MOD;
+//         //     if (y >= MOD) y -= MOD;
+//         //     return g;
+//         // }
+//     public:
+//         constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
+//         constexpr Modular(const Modular& other) : value(other.value) {}
+//         Modular& operator=(const Modular& other) { value = other.value; return *this; }
+//         Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
         
-        T getVal() const { return value; }
-        Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
+//         T getVal() const { return value; }
+//         Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
 
-        Modular operator-() const {
-            Modular res(*this);
-            if (res.value != T(0)) res.value = MOD - res.value;
-            return res;
-        }
-        friend Modular operator+(const Modular& a, const Modular& b) { 
-            Modular res(a);
-            if ((res.value += b.value) >= MOD) res.value -= MOD;
-            return res;
-        }
-        friend Modular operator-(const Modular& a, const Modular& b) { 
-            Modular res(a);
-            if ((res.value -= b.value) < T(0)) res.value += MOD;
-            return res;
-        }
-        friend Modular operator*(const Modular& a, const Modular& b) { return Modular((MCT) a.value * (MCT) b.value % MOD); }
-        Modular& operator+=(const Modular& other) { 
-            if ((value += other.value) >= MOD) value -= MOD;
-            return *this; 
-        }
-        Modular& operator-=(const Modular& other) { 
-            if ((value -= other.value) < 0) { value += MOD; } 
-            return *this; 
-        }
-        Modular& operator*=(const Modular& other) { 
-            value = (MCT) value * (MCT) other.value % MOD; 
-            return *this; 
-        }
-        template <typename U>
-        Modular fPow(U exp) const {
-            Modular result(1);
-            T base = value;
-            while (exp) {
-                if (exp & 1) result.value = (MCT) result.value * (MCT) base % MOD;
-                base = (MCT) base * (MCT) base % MOD;
-                exp >>= 1;
-            }
-            return result;
-        }
-        template <typename U>
-        Modular& fPowSelf(U exp) {
-            T base = value;
-            value = 1;
-            while (exp) {
-                if (exp & 1) value = (MCT) value * (MCT) base % MOD;
-                base = (MCT) base * (MCT) base % MOD;
-                exp >>= 1;
-            }
-            return *this;
-        }
-        Modular inv() const {
-            return fPow(MOD - 2);
-            // T x, y;
-            // T g = exgcd(value, MOD, x, y);
-            // assert(g == 1);
-            // return Modular(x);
-        }
-        Modular& invSelf() {
-            return fPowSelf(MOD - 2);
-            // T x, y;
-            // T g = exgcd(value, MOD, x, y);
-            // assert(g == 1); 
-            // value = x;
-            // return *this;
-        }
-        // 除法运算
-        friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
-        Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
-        // 比较运算
-        friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
-        friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
-        friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
-        friend std::istream& operator>>(std::istream& is, Modular& m) { 
-            T v; 
-            is >> v; 
-            m.setVal(v); 
-            return is; 
-        }
-    };
-}
-#endif
+//         Modular operator-() const {
+//             Modular res(*this);
+//             if (res.value != T(0)) res.value = MOD - res.value;
+//             return res;
+//         }
+//         friend Modular operator+(const Modular& a, const Modular& b) { 
+//             Modular res(a);
+//             if ((res.value += b.value) >= MOD) res.value -= MOD;
+//             return res;
+//         }
+//         friend Modular operator-(const Modular& a, const Modular& b) { 
+//             Modular res(a);
+//             if ((res.value -= b.value) < T(0)) res.value += MOD;
+//             return res;
+//         }
+//         friend Modular operator*(const Modular& a, const Modular& b) { return Modular((MCT) a.value * (MCT) b.value % MOD); }
+//         Modular& operator+=(const Modular& other) { 
+//             if ((value += other.value) >= MOD) value -= MOD;
+//             return *this; 
+//         }
+//         Modular& operator-=(const Modular& other) { 
+//             if ((value -= other.value) < 0) { value += MOD; } 
+//             return *this; 
+//         }
+//         Modular& operator*=(const Modular& other) { 
+//             value = (MCT) value * (MCT) other.value % MOD; 
+//             return *this; 
+//         }
+//         template <typename U>
+//         Modular fPow(U exp) const {
+//             Modular result(1);
+//             T base = value;
+//             while (exp) {
+//                 if (exp & 1) result.value = (MCT) result.value * (MCT) base % MOD;
+//                 base = (MCT) base * (MCT) base % MOD;
+//                 exp >>= 1;
+//             }
+//             return result;
+//         }
+//         template <typename U>
+//         Modular& fPowSelf(U exp) {
+//             T base = value;
+//             value = 1;
+//             while (exp) {
+//                 if (exp & 1) value = (MCT) value * (MCT) base % MOD;
+//                 base = (MCT) base * (MCT) base % MOD;
+//                 exp >>= 1;
+//             }
+//             return *this;
+//         }
+//         Modular inv() const {
+//             return fPow(MOD - 2);
+//             // T x, y;
+//             // T g = exgcd(value, MOD, x, y);
+//             // assert(g == 1);
+//             // return Modular(x);
+//         }
+//         Modular& invSelf() {
+//             return fPowSelf(MOD - 2);
+//             // T x, y;
+//             // T g = exgcd(value, MOD, x, y);
+//             // assert(g == 1); 
+//             // value = x;
+//             // return *this;
+//         }
+//         // 除法运算
+//         friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
+//         Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
+//         // 比较运算
+//         friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
+//         friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
+//         friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
+//         friend std::istream& operator>>(std::istream& is, Modular& m) { 
+//             T v; 
+//             is >> v; 
+//             m.setVal(v); 
+//             return is; 
+//         }
+//     };
+// }
+// #endif
 
-#include <bits/stdc++.h>
-using namespace std;
-using Mint = Modular::Modular<int, 998244353, unsigned long long>;
-inline Mint funcT2TNTT(Mint x) { return x; }
-inline Mint funcTNTT2T(Mint x) { return x; }
-inline Mint funcNTT(size_t x) { return Mint(3).fPow(998244352 / x); } // 332748118
+// #include <bits/stdc++.h>
+// using namespace std;
+// using Mint = Modular::Modular<int, 998244353, unsigned long long>;
+// inline Mint funcT2TNTT(Mint x) { return x; }
+// inline Mint funcTNTT2T(Mint x) { return x; }
+// inline Mint funcNTT(size_t x) { return Mint(3).fPow(998244352 / x); } // 332748118
+// // int main() {
+// //     ios::sync_with_stdio(false);
+// //     cin.tie(nullptr);
+// //     int n, m;
+// //     cin >> n >> m;
+// //     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n + 1), b(m + 1);
+// //     for (auto& x: a)
+// //         cin >> x;
+// //     for (auto& x: b)
+// //         cin >> x;
+// //     a *= b;
+// //     for (auto& x : a)
+// //         cout << x << ' ';
+// //     return 0;
+// // }
 // int main() {
 //     ios::sync_with_stdio(false);
 //     cin.tie(nullptr);
-//     int n, m;
-//     cin >> n >> m;
-//     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n + 1), b(m + 1);
+//     int n;
+//     cin >> n;
+//     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n);
 //     for (auto& x: a)
 //         cin >> x;
-//     for (auto& x: b)
-//         cin >> x;
-//     a *= b;
+//     a.expSelf();
 //     for (auto& x : a)
 //         cout << x << ' ';
 //     return 0;
 // }
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    int n;
-    cin >> n;
-    Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n);
-    for (auto& x: a)
-        cin >> x;
-    a.expSelf();
-    for (auto& x : a)
-        cout << x << ' ';
-    return 0;
-}
 #endif
