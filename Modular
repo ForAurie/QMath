@@ -1,105 +1,108 @@
 #ifndef MODULAR_H
 #define MODULAR_H
-#include <cassert>
 namespace Modular {
-    template <typename T, const T MOD, typename MultiplicationType>
+    template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
     class Modular {
     private:
         T value;
-        T exgcd(const T& a, const T& b, T& x, T& y) const {
-            if (b == 0) {
-                x = 1, y = 0;
-                return a;
-            }
-            T g = exgcd(b, a % b, y, x);
-            y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
-            if (y < 0) y += MOD;
-            if (y >= MOD) y -= MOD;
-            return g;
-        }
+        // T exgcd(const T& a, const T& b, T& x, T& y) const {
+        //     if (b == 0) {
+        //         x = 1, y = 0;
+        //         return a;
+        //     }
+        //     T g = exgcd(b, a % b, y, x);
+        //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
+        //     if (y < 0) y += MOD;
+        //     if (y >= MOD) y -= MOD;
+        //     return g;
+        // }
     public:
-        Modular(const T& v = 0) : value(v % MOD) { if (value < 0) value += MOD; }
-        Modular(const Modular& other) : value(other.value) {}
+        constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
+        constexpr Modular(const Modular& other) : value(other.value) {}
         Modular& operator=(const Modular& other) { value = other.value; return *this; }
-        Modular& operator=(const T& v) { value = v % MOD; if (value < 0) value += MOD; return *this; }
-
-        // 强制类型转换
-        operator int() const { return static_cast<int>(value); }
-        operator long long() const { return static_cast<long long>(value); }
-        operator double() const { return static_cast<double>(value); }
-        operator float() const { return static_cast<float>(value); }
-        operator long double() const { return static_cast<long double>(value); }
-        operator bool() const { return value != T(0); }
+        Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
+        
         T getVal() const { return value; }
         Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
-        // 算术运算
-        Modular operator+(const Modular& other) const { 
-            T result = value + other.value; 
-            if (result >= MOD) { result -= MOD; } 
-            return Modular(result);
+
+        Modular operator-() const {
+            Modular res(*this);
+            if (res.value != T(0)) res.value = MOD - res.value;
+            return res;
         }
-        Modular operator-(const Modular& other) const { 
-            T result = value - other.value; 
-            if (result < 0) { result += MOD; }
-            return Modular(result);
+        friend Modular operator+(const Modular& a, const Modular& b) { 
+            Modular res(a);
+            if ((res.value += b.value) >= MOD) res.value -= MOD;
+            return res;
         }
-        Modular operator*(const Modular& other) const { 
-            return Modular(static_cast<MultiplicationType>(value) * static_cast<MultiplicationType>(other.value) % MOD); 
+        friend Modular operator-(const Modular& a, const Modular& b) { 
+            Modular res(a);
+            if ((res.value -= b.value) < T(0)) res.value += MOD;
+            return res;
         }
+        friend Modular operator*(const Modular& a, const Modular& b) { return Modular((MCT) a.value * (MCT) b.value % MOD); }
         Modular& operator+=(const Modular& other) { 
-            value += other.value; 
-            if (value >= MOD) { value -= MOD; }
+            if ((value += other.value) >= MOD) value -= MOD;
             return *this; 
         }
         Modular& operator-=(const Modular& other) { 
-            value -= other.value; 
-            if (value < 0) { value += MOD; } 
+            if ((value -= other.value) < 0) { value += MOD; } 
             return *this; 
         }
         Modular& operator*=(const Modular& other) { 
-            value = static_cast<MultiplicationType>(value) * static_cast<MultiplicationType>(other.value) % MOD; 
+            value = (MCT) value * (MCT) other.value % MOD; 
             return *this; 
         }
         template <typename U>
         Modular fPow(U exp) const {
-            Modular result(1), base(value);
+            Modular result(1);
+            T base = value;
             while (exp) {
-                if (exp & 1) result *= base;
-                base *= base;
+                if (exp & 1) result.value = (MCT) result.value * (MCT) base % MOD;
+                base = (MCT) base * (MCT) base % MOD;
                 exp >>= 1;
             }
             return result;
         }
         template <typename U>
         Modular& fPowSelf(U exp) {
-            Modular result(1), base(value);
+            T base = value;
+            value = 1;
             while (exp) {
-                if (exp & 1) result *= base;
-                base *= base;
+                if (exp & 1) value = (MCT) value * (MCT) base % MOD;
+                base = (MCT) base * (MCT) base % MOD;
                 exp >>= 1;
             }
-            return *this = result;
-        }
-        // 求逆元
-        Modular inv() const {
-            T x, y;
-            T g = exgcd(value, MOD, x, y);
-            assert(g == 1);
-            return Modular(x);
-        }
-        Modular& invSelf() {
-            T x, y;
-            T g = exgcd(value, MOD, x, y);
-            assert(g == 1); 
-            value = x;
             return *this;
         }
+        Modular inv() const {
+            return fPow(MOD - 2);
+            // T x, y;
+            // T g = exgcd(value, MOD, x, y);
+            // assert(g == 1);
+            // return Modular(x);
+        }
+        Modular& invSelf() {
+            return fPowSelf(MOD - 2);
+            // T x, y;
+            // T g = exgcd(value, MOD, x, y);
+            // assert(g == 1); 
+            // value = x;
+            // return *this;
+        }
         // 除法运算
-        Modular operator/(const Modular& other) const { return *this * other.inv(); }
+        friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
         Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
         // 比较运算
-        bool operator==(const Modular& other) const { return value == other.value; }
-        bool operator!=(const Modular& other) const { return value != other.value; }
+        friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
+        friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
+        friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
+        friend std::istream& operator>>(std::istream& is, Modular& m) { 
+            T v; 
+            is >> v; 
+            m.setVal(v); 
+            return is; 
+        }
     };
 }
 #endif
