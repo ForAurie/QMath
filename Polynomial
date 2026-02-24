@@ -341,24 +341,22 @@ namespace Polynomial {
             return *this;
         }
         Polynomial inv() const {
-            Polynomial res(1, T(1) / this->front());
-            Polynomial tmp(1, this->front());
+            Polynomial res(1, T(1) / this->front()), tmp(1, this->front());
             while (res.size() < this->size()) {
                 tmp.resize(std::min(this->size(), res.size() << 1), T(0));
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
-                (res += res - res * res * tmp) %= (res.size() << 1);
+                (res += res - res * res * tmp) %= tmp.size();
             }
-            return res % this->size();
+            return res;
         }
         Polynomial& invSelf() {
-            Polynomial res(1, T(1) / this->front());
-            Polynomial tmp(1, this->front());
+            Polynomial res(1, T(1) / this->front()), tmp(1, this->front());
             while (res.size() < this->size()) {
                 tmp.resize(std::min(this->size(), res.size() << 1), T(0));
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
-                (res += res - res * res * tmp) %= (res.size() << 1);
+                (res += res - res * res * tmp) %= tmp.size();
             }
-            return *this = res % this->size();
+            return *this = res;
         }
         Polynomial ln() const { return (this->derivative() * this->inv()).integralSelf() %= this->size(); }
         Polynomial& lnSelf() {
@@ -368,15 +366,23 @@ namespace Polynomial {
         }
         Polynomial exp() const {
             if (this->empty()) return Polynomial(0, T(0));
-            if (this->size() == 1) return Polynomial(1, T(1));
-            Polynomial b = ((*this) % ((this->size() + 1) >> 1)).exp();
-            return b + b * (*this - (b % this->size()).ln()) % this->size();
+            Polynomial res(1, T(1)), tmp(1, this->front());
+            while (res.size() < this->size()) {
+                tmp.resize(std::min(this->size(), res.size() << 1), T(0));
+                for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
+                (res += res * (tmp - (res % tmp.size()).ln())) %= tmp.size();
+            }
+            return res;
         }
         Polynomial& expSelf() {
             if (this->empty()) return *this = Polynomial(0, T(0));
-            if (this->size() == 1) return *this = Polynomial(1, T(1));
-            Polynomial b = ((*this) % ((this->size() + 1) >> 1)).exp();
-            return *this = b + b * (*this - (b % this->size()).ln()) % this->size();
+            Polynomial res(1, T(1)), tmp(1, this->front());
+            while (res.size() < this->size()) {
+                tmp.resize(std::min(this->size(), res.size() << 1), T(0));
+                for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
+                (res += res * (tmp - (res % tmp.size()).ln())) %= tmp.size();
+            }
+            return *this = res;
         }
         Polynomial sqrt() const {
             if (this->empty()) return Polynomial(0, T(0));
