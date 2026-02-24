@@ -61,7 +61,7 @@ namespace Polynomial {
     constexpr double PI2 = 6.283185307179586476925286766559005768394338798750211641949889;
     inline std::complex<double> expn(size_t n) { return std::complex<double>(std::cos(PI2 / n), std::sin(PI2 / n)); }
     inline std::complex<double> T2TFFT(double x) { return std::complex<double>(x, 0); }
-    inline double TFFT2T(std::complex<double> x) { return x.real(); }
+    inline double TFFT2T(const std::complex<double>& x) { return x.real(); }
 
     // 老版本
     // template<typename TFFT, TFFT (*expn)(long long n)>
