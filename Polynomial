@@ -386,15 +386,23 @@ namespace Polynomial {
         }
         Polynomial sqrt() const {
             if (this->empty()) return Polynomial(0, T(0));
-            if (this->size() == 1) return Polynomial(1, T(1));
-            Polynomial b = ((*this) % ((this->size() + 1) >> 1)).sqrt();
-            return (*this + b * b) * ((b + b) % this->size()).inv() % this->size();
+            Polynomial res(1, T(1)), tmp(1, this->front());
+            while (res.size() < this->size()) {
+                tmp.resize(std::min(this->size(), res.size() << 1), T(0));
+                for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
+                (res = (tmp + res * res) * ((res + res) % tmp.size()).inv()) %= tmp.size();
+            }
+            return res;
         }
         Polynomial& sqrtSelf() {
             if (this->empty()) return *this = Polynomial(0, T(0));
-            if (this->size() == 1) return *this = Polynomial(1, T(1));
-            Polynomial b = ((*this) % ((this->size() + 1) >> 1)).sqrt();
-            return *this = (*this + b * b) * ((b + b) % this->size()).inv() % this->size(); 
+            Polynomial res(1, T(1)), tmp(1, this->front());
+            while (res.size() < this->size()) {
+                tmp.resize(std::min(this->size(), res.size() << 1), T(0));
+                for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
+                (res = (tmp + res * res) * ((res + res) % tmp.size()).inv()) %= tmp.size();
+            }
+            return *this = res; 
         }
         Polynomial operator|(const Polynomial& o) const {
             if (std::min(this->size(), o.size()) <= 64) {
