@@ -35,11 +35,11 @@ namespace Modular {
             return *this; 
         }
         Modular& operator-=(const Modular& other) { 
-            if ((value -= other.value) < 0) { value += MOD; } 
+            if ((value -= other.value) < T(0)) value += MOD;
             return *this; 
         }
         Modular& operator*=(const Modular& other) { 
-            value = (MCT) value * (MCT) other.value % MOD; 
+            value = (MCT) value * (MCT) other.value % MOD;
             return *this; 
         }
         template <typename U>
