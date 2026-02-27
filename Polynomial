@@ -9,7 +9,6 @@
 #include <tuple>
 #include <mutex>
 #include <type_traits>
-
 #include <cstddef>
 #include <cstdint>
 
@@ -57,51 +56,10 @@ namespace Polynomial {
         if (n == 1) return 0;
         return log2Floor(n - 1) + 1;
     }
-
     constexpr double PI2 = 6.283185307179586476925286766559005768394338798750211641949889;
     inline std::complex<double> expn(size_t n) { return std::complex<double>(std::cos(PI2 / n), std::sin(PI2 / n)); }
     inline std::complex<double> T2TFFT(double x) { return std::complex<double>(x, 0); }
     inline double TFFT2T(const std::complex<double>& x) { return x.real(); }
-
-    // 老版本
-    // template<typename TFFT, TFFT (*expn)(long long n)>
-    // inline void DFT(std::vector<TFFT>& a) {
-    //     TFFT t;
-    //     std::vector<TFFT> w(a.size() >> 1, TFFT(1));
-    //     for (size_t l2 = 1; l2 < a.size(); l2 <<= 1) {
-    //         const TFFT wn = expn(l2 << 1);
-    //         for (auto i = w.begin() + 1, j = w.begin(), ed = w.begin() + l2; i != ed; ++i, ++j) (*i) = (*j) * wn;
-    //         for (auto i = a.begin(); i != a.end(); i += l2) {
-    //             auto id = w.begin(), ed = w.begin() + l2;
-    //             for (auto j = i + l2; id != ed; ++i, ++j, ++id) {
-    //                 auto &x = *i, &y = *j;
-    //                 t = (*id) * y, y = x - t, x += t;
-    //             }
-    //         }
-    //     }
-    // }
-    // template<typename TFFT, TFFT (*expn)(long long n)>
-    // inline void IDFT(std::vector<TFFT>& a) {
-    //     TFFT t;
-    //     std::vector<TFFT> w(a.size() >> 1, TFFT(1));
-    //     for (size_t l2 = 1; l2 < a.size(); l2 <<= 1) {
-    //         const TFFT wn = expn(-(long long) (l2 << 1));
-    //         for (auto i = w.begin() + 1, j = w.begin(), ed = w.begin() + l2; i != ed; ++i, ++j) (*i) = (*j) * wn;
-    //         for (auto i = a.begin(); i != a.end(); i += l2) {
-    //             auto id = w.begin(), ed = w.begin() + l2;
-    //             for (auto j = i + l2; id != ed; ++i, ++j, ++id) {
-    //                 auto &x = *i, &y = *j;
-    //                 t = (*id) * y, y = x - t, x += t;
-    //             }
-    //         }
-    //     }
-    // }
-    // template<typename T = double, typename TFFT = std::complex<double>,
-    //         TFFT (*T2TFFT)(T) = funcT2FFT,
-    //         T (*TFFT2T)(TFFT) = funcFFT2T,
-    //         TFFT (*expn)(long long n) = funcFFT
-    //         >
-
     template<typename T = double,
              typename TFFT = std::complex<double>,
              auto T2TFFT = T2TFFT,
@@ -124,27 +82,67 @@ namespace Polynomial {
                 } while (sz < n);
             }
         }
-        inline void DFT(std::vector<TFFT>& a) {
+        inline void DFTIteration(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
             auto& unitRoots = get_unit_roots();
-            for(size_t l2 = a.size() >> 1; l2; l2 >>= 1)
-                for(auto i = a.begin(), ww = unitRoots.begin(); i != a.end(); i += l2 << 1, ++ww)
+            for(size_t l2 = (r - l) >> 1; l2; l2 >>= 1, id <<= 1)
+                for(auto i = l, ww = unitRoots.begin() + id; i != r; i += l2 << 1, ++ww) {
+                    auto &w = *ww;
                     for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
-                        auto &u = *uu, &v = *vv, &w = *ww;
-                        std::tie(u, v) = std::pair{u + v * w, u - v * w};
+                        auto &u = *uu, &v = *vv; auto temp = v * w;
+                        std::tie(u, v) = std::pair{u + temp, u - temp};
                     }
+                }
         }
-        inline void IDFT(std::vector<TFFT>& a) {
-            auto& unitRoots = get_unit_roots();
-            for(size_t l2 = 1; l2 < a.size(); l2 <<= 1)
-                for(auto i = a.begin(), ww = unitRoots.begin(); i != a.end(); i += l2 << 1, ++ww)
+        inline void IDFTIteration(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            auto& unitRoots = get_unit_roots(); const size_t n = r - l;
+            id <<= log2Floor(n) - 1;
+            for(size_t l2 = 1; l2 < n; l2 <<= 1, id >>= 1)
+                for(auto i = l, ww = unitRoots.begin() + id; i != r; i += l2 << 1, ++ww) {
+                    auto &w = *ww;
                     for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
-                        auto &u = *uu, &v = *vv, &w = *ww;
+                        auto &u = *uu, &v = *vv;
                         std::tie(u, v) = std::pair{u + v, (u - v) * w};
                     }
-            std::reverse(a.begin() + 1, a.end());
+                }
+        }
+        template<size_t n>
+        inline void DFTRecursion(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            if constexpr (n <= 4096) DFTIteration(l, r, id);
+            else {
+                auto mid = l + ((r - l) >> 1);
+                for (auto i = l, j = mid, w = get_unit_roots()[id]; j != r; ++i, ++j) {
+                    auto &u = *i, &v = *j; auto temp = v * w;
+                    std::tie(u, v) = std::pair{u + temp, u - temp};
+                }
+                id <<= 1;
+                constexpr size_t m = n >> 1;
+                DFTRecursion<m>(l, mid, id);
+                DFTRecursion<m>(mid, r, id | 1);
+            }
+        }
+        template<size_t n>
+        inline void IDFTRecursion(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            if constexpr (n <= 4096) IDFTIteration(l, r, id);
+            else {
+                constexpr size_t m = n >> 1;
+                auto mid = l + ((r - l) >> 1);
+                IDFTRecursion<m>(l, mid, id << 1);
+                IDFTRecursion<m>(mid, r, id << 1 | 1);
+                for (auto w = get_unit_roots()[id]; mid != r; ++l, ++mid) {
+                    auto &u = *l, &v = *mid;
+                    std::tie(u, v) = std::pair{u + v, (u - v) * w};
+                }
+            }
+        }
+        inline void DFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            size_t n = r - l; switch (n) {case 128:{DFTRecursion<128>(l, r, id);break;}case 256:{DFTRecursion<256>(l, r, id);break;}case 512:{DFTRecursion<512>(l, r, id);break;}case 1024:{DFTRecursion<1024>(l, r, id);break;}case 2048:{DFTRecursion<2048>(l, r, id);break;}case 4096:{DFTRecursion<4096>(l, r, id);break;}case 8192:{DFTRecursion<8192>(l, r, id);break;}case 16384:{DFTRecursion<16384>(l, r, id);break;}case 32768:{DFTRecursion<32768>(l, r, id);break;}case 65536:{DFTRecursion<65536>(l, r, id);break;}case 131072:{DFTRecursion<131072>(l, r, id);break;}case 262144:{DFTRecursion<262144>(l, r, id);break;}case 524288:{DFTRecursion<524288>(l, r, id);break;}case 1048576:{DFTRecursion<1048576>(l, r, id);break;}case 2097152:{DFTRecursion<2097152>(l, r, id);break;}case 4194304:{DFTRecursion<4194304>(l, r, id);break;}case 8388608:{DFTRecursion<8388608>(l, r, id);break;}case 16777216:{DFTRecursion<16777216>(l, r, id);break;}}
+        }
+        inline void IDFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            size_t n = r - l; switch (n) {case 128:{IDFTRecursion<128>(l, r, id);break;}case 256:{IDFTRecursion<256>(l, r, id);break;}case 512:{IDFTRecursion<512>(l, r, id);break;}case 1024:{IDFTRecursion<1024>(l, r, id);break;}case 2048:{IDFTRecursion<2048>(l, r, id);break;}case 4096:{IDFTRecursion<4096>(l, r, id);break;}case 8192:{IDFTRecursion<8192>(l, r, id);break;}case 16384:{IDFTRecursion<16384>(l, r, id);break;}case 32768:{IDFTRecursion<32768>(l, r, id);break;}case 65536:{IDFTRecursion<65536>(l, r, id);break;}case 131072:{IDFTRecursion<131072>(l, r, id);break;}case 262144:{IDFTRecursion<262144>(l, r, id);break;}case 524288:{IDFTRecursion<524288>(l, r, id);break;}case 1048576:{IDFTRecursion<1048576>(l, r, id);break;}case 2097152:{IDFTRecursion<2097152>(l, r, id);break;}case 4194304:{IDFTRecursion<4194304>(l, r, id);break;}case 8388608:{IDFTRecursion<8388608>(l, r, id);break;}case 16777216:{IDFTRecursion<16777216>(l, r, id);break;}}
+            std::reverse(l + 1, r);
         }
     public:
-        static void init() {
+        static void clearCache() {
             get_unit_roots().clear();
             get_unit_roots().shrink_to_fit();
             get_unit_roots().push_back(TFFT(1));
@@ -255,9 +253,9 @@ namespace Polynomial {
                 if constexpr (std::is_same<TFFT, T>::value) {
                     const size_t len = this->size() + o.size() - 1;
                     this->resize(n, T(0));
-                    DFT(*this);
+                    DFT(this->begin(), this->end());
                     for (auto& i : *this) i *= i;
-                    IDFT(*this);
+                    IDFT(this->begin(), this->end());
                     this->resize(len);
                     const TFFT div = TFFT(1) / TFFT(n);
                     for (auto& i : *this) i *= div;
@@ -268,9 +266,9 @@ namespace Polynomial {
                         auto j = a.begin();
                         for (auto i = this->begin(); i != this->end(); ++i, ++j) (*j) = T2TFFT(*i);
                     }
-                    DFT(a);
+                    DFT(a.begin(), a.end());
                     for (auto& i : a) i *= i;
-                    IDFT(a);
+                    IDFT(a.begin(), a.end());
                     this->resize(this->size() + o.size() - 1, T(0));
                     const TFFT div = TFFT(1) / TFFT(n);
                     for (size_t i = 0; i < this->size(); i++) operator[](i) = TFFT2T(a[i] * div);
@@ -287,9 +285,9 @@ namespace Polynomial {
                     auto j = a.begin();
                     for (auto i = o.begin(); i != o.end(); ++i, ++j) j->imag(*i);
                 }
-                DFT(a);
+                DFT(a.begin(), a.end());
                 for (auto& i : a) i *= i;
-                IDFT(a);
+                IDFT(a.begin(), a.end());
                 this->resize(this->size() + o.size() - 1, T(0));
                 const T div = T(1) / T(n << 1);
                 for (size_t i = 0; i < this->size(); i++) operator[](i) = a[i].imag() * div;
@@ -299,9 +297,9 @@ namespace Polynomial {
                     const size_t len = this->size() + o.size() - 1;
                     this->resize(n, T(0));
                     std::vector<TFFT> b(o); b.resize(n, T(0));
-                    DFT(*this), DFT(b);
+                    DFT(this->begin(), this->end()), DFT(b.begin(), b.end());
                     for (auto i = this->begin(), j = b.begin(); i != this->end(); ++i, ++j) (*i) *= (*j);
-                    IDFT(*this);
+                    IDFT(this->begin(), this->end());
                     this->resize(len);
                     const TFFT div = TFFT(1) / TFFT(n);
                     for (auto& i : *this) i *= div;
@@ -316,9 +314,9 @@ namespace Polynomial {
                         auto j = b.begin();
                         for (auto i = o.begin(); i != o.end(); ++i, ++j) (*j) = T2TFFT(*i);
                     }
-                    DFT(a), DFT(b);
+                    DFT(a.begin(), a.end()), DFT(b.begin(), b.end());
                     for (auto i = a.begin(), j = b.begin(); i != a.end(); ++i, ++j) (*i) *= (*j);
-                    IDFT(a);
+                    IDFT(a.begin(), a.end());
                     this->resize(this->size() + o.size() - 1, T(0));
                     const TFFT div = TFFT(1) / TFFT(n);
                     for (size_t i = 0; i < this->size(); i++) operator[](i) = TFFT2T(a[i] * div);
@@ -830,59 +828,6 @@ namespace Polynomial {
 //         }
 //         return *this;
 //     }
-//     // template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-//     // inline FastIO& operator<<(T x) {
-//     //     if (std::isnan(x)) return putchar('n'), putchar('a'), putchar('n'), *this;
-//     //     if (std::isinf(x)) {
-//     //         if (x < 0) putchar('-');
-//     //         putchar('i'), putchar('n'), putchar('f');
-//     //         return *this;
-//     //     }
-//     //     if (x < 0) {
-//     //         putchar('-');
-//     //         x = -x;
-//     //     }
-//     //     int exp10 = 0;
-//     //     if (useScientific && (x != 0.0) && (x < 1e-4 || x >= 1e6)) {
-//     //         exp10 = static_cast<int>(std::floor(std::log10(x)));
-//     //         x /= std::pow(10.0, exp10);
-//     //     }
-//     //     T intPart;
-//     //     T fracPart = std::modf(x, &intPart);
-//     //     static char buf[1024];
-//     //     int n = 0;
-//     //     if (intPart < 1) buf[n++] = '0';
-//     //     else {
-//     //         while (intPart >= 1) {
-//     //             T tmp = std::floor(std::fmod(intPart, 10));
-//     //             buf[n++] = static_cast<int>(tmp + 1e-4) | 0x30;
-//     //             intPart = std::floor(intPart / 10);
-//     //         }
-//     //     }
-//     //     while (n--) putchar(buf[n]);
-//     //     if (floatPrecision > 0) {
-//     //         putchar('.');
-//     //         for (int i = 0; i < floatPrecision; ++i) {
-//     //             fracPart *= 10;
-//     //             int digit = fracPart + 1e-4;
-//     //             buf[fracLen++] =  | 0x30;
-//     //             fracPart -= digit;
-//     //         }
-//     //         // // 去除尾随0
-//     //         // while (fracLen > 0 && fracBuf[fracLen - 1] == '0') fracLen--;
-//     //         // for (int i = 0; i < fracLen; ++i) putchar(fracBuf[i]);
-//     //     }
-//     //     if (exp10 != 0) {
-//     //         putchar('e');
-//     //         if (exp10 < 0) putchar('-'), exp10 = -exp10;
-//     //         static char expBuf[8];
-//     //         int n = 0;
-//     //         do expBuf[n++] = exp10 % 10 | 0x30, exp10 /= 10;
-//     //         while (exp10);
-//     //         while (n--) putchar(expBuf[n]);
-//     //     }
-//     //     return *this;
-//     // }
 //     inline FastIO& operator<<(char ch) { putchar(ch); return *this; }
 //     inline FastIO& operator>>(char& ch) {
 //         ch = getchar();
@@ -919,32 +864,30 @@ namespace Polynomial {
 // inline Mint funcTNTT2T(Mint x) { return x; }
 // inline Mint funcNTT(size_t x) { return Mint(3).fPow(998244352 / x); } // 332748118
 // // int main() {
-// //     // ios::sync_with_stdio(false);
-// //     // cin.tie(nullptr);
+// //     int n, m;
+// //     cin >> n >> m;
+// //     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n + 1), b(m + 1);
+// //     int t;
+// //     for (auto& x: a)
+// //         cin >> t, x.setVal(t);
+// //     for (auto& x: b)
+// //         cin >> t, x.setVal(t);
+// //     a *= b;
+// //     for (auto& x : a)
+// //         cout << x.getVal() << ' ';
+// //     return 0;
+// // }
+// // int main() { // f
 // //     int n, m;
 // //     cin >> n >> m;
 // //     Polynomial::Polynomial<double, complex<double>, Polynomial::T2TFFT, Polynomial::TFFT2T, Polynomial::expn> a(n + 1), b(m + 1);
-// //     // Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n + 1), b(m + 1);
 // //     for (auto& x: a)
 // //         cin >> x;
 // //     for (auto& x: b)
 // //         cin >> x;
 // //     a *= b;
 // //     for (auto& x : a)
-// //         cout << (int) (x + 0.5) << ' ';
+// //         cout << (int)(x + 0.5) << ' ';
 // //     return 0;
 // // }
-// int main() {
-//     // ios::sync_with_stdio(false);
-//     // cin.tie(nullptr);
-//     int n, tmp;
-//     cin >> n;
-//     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n);
-//     for (auto& x: a)
-//         cin >> tmp, x.setVal(tmp);
-//     a.invSelf();
-//     for (auto& x : a)
-//         cout << x.getVal() << ' ';
-//     return 0;
-// }
 #endif

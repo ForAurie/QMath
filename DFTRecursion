@@ -1,0 +1,180 @@
+        inline void DFTRecursion(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r) {
+            auto &unitRoots = get_unit_roots();
+            std::vector<size_t> stk(1, 0b10);
+            const size_t n = r - l; stk.reserve(log2Floor(n));
+            while (stk.size()) { // 这个玩意通过阴间的进出栈条件保证了长度为 1 的永远不会入栈。。。（<=64 会跑暴力），size_t 最低为作标记，剩余作下标
+                auto t = stk.back(); stk.pop_back();
+                if (t & 1) stk.push_back(t << 1);
+                else {
+                    int d = log2Floor(t); size_t id = (t ^ (1ull << d)) >> 1; --d;
+                    const size_t len = n >> d;
+                    const auto &w = unitRoots[id];
+                    const auto bk = l + len * (++id);
+                    for (auto i = bk - len, j = bk - (len >> 1); j != bk; ++i, ++j) {
+                        auto &u = *i, &v = *j; auto temp = v * w;
+                        std::tie(u, v) = std::pair{u + temp, u - temp};
+                    }
+                    if (len > 2) stk.push_back(t | 1), stk.push_back(t << 1);
+                }
+            }
+        }
+        inline void IDFTRecursion(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r) {
+            auto &unitRoots = get_unit_roots();
+            std::vector<std::pair<size_t, unsigned char>> stk(1, std::make_pair(1, 0));
+            const size_t n = r - l; stk.reserve(log2Floor(n));
+            while (stk.size()) {
+                auto [t, flag] = stk.back(); stk.pop_back();
+                if (flag == 0) {
+                    const int d = log2Floor(t); const size_t len = n >> d;
+                    if (len == 2) {
+                        size_t id = (t ^ (1ull << d));
+                        const auto& w = unitRoots[id];
+                        const auto bk = l + len * (++id);
+                        for (auto i = bk - len, j = bk - (len >> 1); j != bk; ++i, ++j) {
+                            auto &u = *i, &v = *j;
+                            std::tie(u, v) = std::pair{u + v, (u - v) * w};
+                        }
+                    } else stk.push_back(std::make_pair(t, 1)), stk.push_back(std::make_pair(t << 1, 0));
+                } else if (flag == 1) stk.push_back(std::make_pair(t, 2)), stk.push_back(std::make_pair(t << 1 | 1, 0));
+                else {
+                    const int d = log2Floor(t); const size_t len = n >> d; size_t id = (t ^ (1ull << d));
+                    const auto& w = get_unit_roots()[id];
+                    const auto bk = l + len * (++id);
+                    for (auto i = bk - len, j = bk - (len >> 1); j != bk; ++i, ++j) {
+                        auto &u = *i, &v = *j;
+                        std::tie(u, v) = std::pair{u + v, (u - v) * w};
+                    }
+                }
+            }
+            std::reverse(l + 1, r);
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        template<size_t n>
+        void __DFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            if constexpr (n == 1) return;
+            else {
+                auto mid = l + ((r - l) >> 1);
+                for (auto i = l, j = mid, w = get_unit_roots()[id]; j != r; ++i, ++j) {
+                    auto &u = *i, &v = *j; auto temp = v * w;
+                    std::tie(u, v) = std::pair{u + temp, u - temp};
+                }
+                id <<= 1;
+                constexpr size_t m = n >> 1;
+                __DFT<m>(l, mid, id);
+                __DFT<m>(mid, r, id | 1);
+            }
+        }
+        template<size_t n>
+        void __IDFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            if constexpr (n == 1) return;
+            else {
+                constexpr size_t m = n >> 1;
+                auto mid = l + ((r - l) >> 1);
+                __IDFT<m>(l, mid, id << 1);
+                __IDFT<m>(mid, r, id << 1 | 1);
+                for (auto w = get_unit_roots()[id]; mid != r; ++l, ++mid) {
+                    auto &u = *l, &v = *mid;
+                    std::tie(u, v) = std::pair{u + v, (u - v) * w};
+                }
+            }
+        }
+        inline void DFTinline(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            size_t n = r - l;
+            switch (n) {case 128:{__DFT<128>(l, r, id);break;}case 256:{__DFT<256>(l, r, id);break;}case 512:{__DFT<512>(l, r, id);break;}case 1024:{__DFT<1024>(l, r, id);break;}case 2048:{__DFT<2048>(l, r, id);break;}case 4096:{__DFT<4096>(l, r, id);break;}case 8192:{__DFT<8192>(l, r, id);break;}case 16384:{__DFT<16384>(l, r, id);break;}case 32768:{__DFT<32768>(l, r, id);break;}case 65536:{__DFT<65536>(l, r, id);break;}case 131072:{__DFT<131072>(l, r, id);break;}case 262144:{__DFT<262144>(l, r, id);break;}case 524288:{__DFT<524288>(l, r, id);break;}case 1048576:{__DFT<1048576>(l, r, id);break;}case 2097152:{__DFT<2097152>(l, r, id);break;}case 4194304:{__DFT<4194304>(l, r, id);break;}case 8388608:{__DFT<8388608>(l, r, id);break;}case 16777216:{__DFT<16777216>(l, r, id);break;}}
+        }
+        inline void IDFTinline(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+            size_t n = r - l;
+            switch (n) {case 128:{__IDFT<128>(l, r, id);break;}case 256:{__IDFT<256>(l, r, id);break;}case 512:{__IDFT<512>(l, r, id);break;}case 1024:{__IDFT<1024>(l, r, id);break;}case 2048:{__IDFT<2048>(l, r, id);break;}case 4096:{__IDFT<4096>(l, r, id);break;}case 8192:{__IDFT<8192>(l, r, id);break;}case 16384:{__IDFT<16384>(l, r, id);break;}case 32768:{__IDFT<32768>(l, r, id);break;}case 65536:{__IDFT<65536>(l, r, id);break;}case 131072:{__IDFT<131072>(l, r, id);break;}case 262144:{__IDFT<262144>(l, r, id);break;}case 524288:{__IDFT<524288>(l, r, id);break;}case 1048576:{__IDFT<1048576>(l, r, id);break;}case 2097152:{__IDFT<2097152>(l, r, id);break;}case 4194304:{__IDFT<4194304>(l, r, id);break;}case 8388608:{__IDFT<8388608>(l, r, id);break;}case 16777216:{__IDFT<16777216>(l, r, id);break;}}
+            // std::reverse(l + 1, r);
+        }
+        // Iteration
+        inline void DFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r) {
+            auto& unitRoots = get_unit_roots();
+            for(size_t l2 = (r - l) >> 1; l2 > 1024; l2 >>= 1)
+                for(auto i = l, ww = unitRoots.begin(); i != r; i += l2 << 1, ++ww) {
+                    auto &w = *ww;
+                    for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
+                        auto &u = *uu, &v = *vv; auto temp = v * w;
+                        std::tie(u, v) = std::pair{u + temp, u - temp};
+                    }
+                }
+            size_t id = 0, L = std::min((size_t) 2048, (size_t) (r - l));
+            for (auto i = l; i != r; i += L, ++id) DFTinline(i, i + L, id);
+        }
+        inline void IDFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r) {
+            auto& unitRoots = get_unit_roots(); const size_t n = r - l;
+            size_t id = 0, L = std::min((size_t) 2048, n);
+            for (auto i = l; i != r; i += L, ++id) IDFTinline(i, i + L, id);
+            for(size_t l2 = 2048; l2 < n; l2 <<= 1)
+                for(auto i = l, ww = unitRoots.begin(); i != r; i += l2 << 1, ++ww) {
+                    auto &w = *ww;
+                    for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
+                        auto &u = *uu, &v = *vv;
+                        std::tie(u, v) = std::pair{u + v, (u - v) * w};
+                    }
+                }
+            std::reverse(l + 1, r);
+        }
