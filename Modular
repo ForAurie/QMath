@@ -1,6 +1,7 @@
 #ifndef MODULAR_H
 #define MODULAR_H
-namespace Modular {
+#include <iostream>
+namespace QMath {
     template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
     class Modular {
     private:

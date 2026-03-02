@@ -12,10 +12,12 @@
 #include <cstddef>
 #include <cstdint>
 
+/* begin ---------- log2Floor ---------- begin */
+
 // 尝试使用 C++20 标准库 (最推荐，如果编译器支持)
 #if defined(__cplusplus) && __cplusplus >= 202002L
 #include <bit>
-namespace Polynomial {
+namespace QMath {
     inline int log2Floor(size_t n) { return static_cast<int>(std::bit_width(n)) - 1; }
 }
 // MSVC (Windows)
@@ -23,7 +25,7 @@ namespace Polynomial {
 #include <intrin.h>
 #pragma intrinsic(_BitScanReverse64)
 #pragma intrinsic(_BitScanReverse)
-namespace Polynomial {
+namespace QMath {
     inline int log2Floor(size_t n) {
         unsigned long index;
         if constexpr (sizeof(size_t) == 8) {
@@ -36,12 +38,12 @@ namespace Polynomial {
 }
 // GCC / Clang / ICC (原有逻辑保留)
 #elif defined(__GNUC__) || defined(__clang__)
-namespace Polynomial {
+namespace QMath {
     inline int log2Floor(size_t n) { return (static_cast<int>(sizeof(n) * 8) - 1) - __builtin_clzll(static_cast<unsigned long long>(n)); }
 }
 // 其他未知编译器的纯 C++ 回退方案 (Portable Fallback)
 #else
-namespace Polynomial {
+namespace QMath {
     inline int log2Floor(size_t n) {
         if (n == 0) return -1;
         int log = 0;
@@ -51,38 +53,53 @@ namespace Polynomial {
 }
 #endif
 
-namespace Polynomial {
+/* end ---------- log2Floor ---------- end */
+
+namespace QMath {
+    /* begin ---------- log2Ceil ---------- begin */
     inline int log2Ceil(size_t n) {
         if (n == 1) return 0;
         return log2Floor(n - 1) + 1;
     }
+    // template<typename T>
+    // inline T __return0(const T& x) { return T(0); }
+    // template<typename T>
+    // inline T __return1(const T& x) { return T(1); }
+    /* end ---------- log2Ceil ---------- end */
+    
+    /* begin ---------- FFT ---------- begin */
     constexpr double PI2 = 6.283185307179586476925286766559005768394338798750211641949889;
-    inline std::complex<double> expn(size_t n) { return std::complex<double>(std::cos(PI2 / n), std::sin(PI2 / n)); }
+    inline std::complex<double> expn(size_t n) { return std::complex<double>(std::cos(PI2 / n), std::sin(PI2 / n)); } // C++ 貌似有原根计算函数，不过都写好了，就这吧
     inline std::complex<double> T2TFFT(double x) { return std::complex<double>(x, 0); }
     inline double TFFT2T(const std::complex<double>& x) { return x.real(); }
+    /* end ---------- FFT ---------- end */
+
     template<typename T = double,
-             typename TFFT = std::complex<double>,
-             auto T2TFFT = T2TFFT,
-             auto TFFT2T = TFFT2T,
-             auto expn = expn
+             typename TDFT = std::complex<double>,
+             auto UR = expn,
+             auto T2TDFT = T2TFFT,
+             auto TDFT2T = TFFT2T
              >
     class Polynomial:public std::vector<T> {
     private:
-        static std::vector<TFFT>& get_unit_roots() { thread_local static std::vector<TFFT> unitRoots = {TFFT(1)}; return unitRoots; }
+        static T __return1([[maybe_unused]] const T& x) { return T(1); }
+        static T __return0([[maybe_unused]] const T& x) { return T(0); }
+        static std::vector<TDFT>& get_unit_roots() { thread_local static std::vector<TDFT> unitRoots = {TDFT(1)}; return unitRoots; }
         static size_t& get_root_size() { thread_local static size_t sz = 1; return sz; }
         static void ensure_precomputed(size_t n) {
-            auto& unitRoots = get_unit_roots();
-            auto& sz = get_root_size();
+            auto& unitRoots = get_unit_roots(); auto& sz = get_root_size();
             if (sz < n) {
                 unitRoots.resize(n);
                 do {
-                    const TFFT wn = expn(sz << 2);
+                    const TDFT wn = UR(sz << 2);
                     for (size_t i = 0; i < sz; ++i) unitRoots[sz + i] = unitRoots[i] * wn;
                     sz <<= 1;
                 } while (sz < n);
             }
         }
-        inline void DFTIteration(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+        #define LEN_THRESHOLD0 4096
+        #define LEN_THRESHOLD1 16777216
+        inline void DFTIteration(typename std::vector<TDFT>::iterator l, typename std::vector<TDFT>::iterator r, size_t id = 0) {
             auto& unitRoots = get_unit_roots();
             for(size_t l2 = (r - l) >> 1; l2; l2 >>= 1, id <<= 1)
                 for(auto i = l, ww = unitRoots.begin() + id; i != r; i += l2 << 1, ++ww) {
@@ -93,7 +110,7 @@ namespace Polynomial {
                     }
                 }
         }
-        inline void IDFTIteration(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
+        inline void IDFTIteration(typename std::vector<TDFT>::iterator l, typename std::vector<TDFT>::iterator r, size_t id = 0) {
             auto& unitRoots = get_unit_roots(); const size_t n = r - l;
             id <<= log2Floor(n) - 1;
             for(size_t l2 = 1; l2 < n; l2 <<= 1, id >>= 1)
@@ -106,8 +123,8 @@ namespace Polynomial {
                 }
         }
         template<size_t n>
-        inline void DFTRecursion(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
-            if constexpr (n <= 4096) DFTIteration(l, r, id);
+        inline void DFTRecursion(typename std::vector<TDFT>::iterator l, typename std::vector<TDFT>::iterator r, size_t id = 0) {
+            if constexpr (n <= LEN_THRESHOLD0) DFTIteration(l, r, id);
             else {
                 auto mid = l + ((r - l) >> 1);
                 for (auto i = l, j = mid, w = get_unit_roots()[id]; j != r; ++i, ++j) {
@@ -121,8 +138,8 @@ namespace Polynomial {
             }
         }
         template<size_t n>
-        inline void IDFTRecursion(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
-            if constexpr (n <= 4096) IDFTIteration(l, r, id);
+        inline void IDFTRecursion(typename std::vector<TDFT>::iterator l, typename std::vector<TDFT>::iterator r, size_t id = 0) {
+            if constexpr (n <= LEN_THRESHOLD0) IDFTIteration(l, r, id);
             else {
                 constexpr size_t m = n >> 1;
                 auto mid = l + ((r - l) >> 1);
@@ -134,38 +151,69 @@ namespace Polynomial {
                 }
             }
         }
-        inline void DFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
-            size_t n = r - l; switch (n) {case 128:{DFTRecursion<128>(l, r, id);break;}case 256:{DFTRecursion<256>(l, r, id);break;}case 512:{DFTRecursion<512>(l, r, id);break;}case 1024:{DFTRecursion<1024>(l, r, id);break;}case 2048:{DFTRecursion<2048>(l, r, id);break;}case 4096:{DFTRecursion<4096>(l, r, id);break;}case 8192:{DFTRecursion<8192>(l, r, id);break;}case 16384:{DFTRecursion<16384>(l, r, id);break;}case 32768:{DFTRecursion<32768>(l, r, id);break;}case 65536:{DFTRecursion<65536>(l, r, id);break;}case 131072:{DFTRecursion<131072>(l, r, id);break;}case 262144:{DFTRecursion<262144>(l, r, id);break;}case 524288:{DFTRecursion<524288>(l, r, id);break;}case 1048576:{DFTRecursion<1048576>(l, r, id);break;}case 2097152:{DFTRecursion<2097152>(l, r, id);break;}case 4194304:{DFTRecursion<4194304>(l, r, id);break;}case 8388608:{DFTRecursion<8388608>(l, r, id);break;}case 16777216:{DFTRecursion<16777216>(l, r, id);break;}}
+        inline void DFT(typename std::vector<TDFT>::iterator l, typename std::vector<TDFT>::iterator r) {
+            auto& unitRoots = get_unit_roots();
+            size_t n = r - l;
+            for(size_t l2 = n >> 1; l2 >= LEN_THRESHOLD1; l2 >>= 1)
+                for(auto i = l, ww = unitRoots.begin(); i != r; i += l2 << 1, ++ww) {
+                    auto &w = *ww;
+                    for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
+                        auto &u = *uu, &v = *vv; auto temp = v * w;
+                        std::tie(u, v) = std::pair{u + temp, u - temp};
+                    }
+                }
+            if (n > LEN_THRESHOLD1) {
+                size_t idx = 0;
+                for (auto i = l; i != r; i += LEN_THRESHOLD1, ++idx) DFTRecursion<LEN_THRESHOLD1>(i, i + LEN_THRESHOLD1,idx);
+            } else switch (n) {case 128:{DFTRecursion<128>(l, r);break;}case 256:{DFTRecursion<256>(l, r);break;}case 512:{DFTRecursion<512>(l, r);break;}case 1024:{DFTRecursion<1024>(l, r);break;}case 2048:{DFTRecursion<2048>(l, r);break;}case 4096:{DFTRecursion<4096>(l, r);break;}case 8192:{DFTRecursion<8192>(l, r);break;}case 16384:{DFTRecursion<16384>(l, r);break;}case 32768:{DFTRecursion<32768>(l, r);break;}case 65536:{DFTRecursion<65536>(l, r);break;}case 131072:{DFTRecursion<131072>(l, r);break;}case 262144:{DFTRecursion<262144>(l, r);break;}case 524288:{DFTRecursion<524288>(l, r);break;}case 1048576:{DFTRecursion<1048576>(l, r);break;}case 2097152:{DFTRecursion<2097152>(l, r);break;}case 4194304:{DFTRecursion<4194304>(l, r);break;}case 8388608:{DFTRecursion<8388608>(l, r);break;}case 16777216:{DFTRecursion<16777216>(l, r);break;}}
         }
-        inline void IDFT(std::vector<TFFT>::iterator l, std::vector<TFFT>::iterator r, size_t id = 0) {
-            size_t n = r - l; switch (n) {case 128:{IDFTRecursion<128>(l, r, id);break;}case 256:{IDFTRecursion<256>(l, r, id);break;}case 512:{IDFTRecursion<512>(l, r, id);break;}case 1024:{IDFTRecursion<1024>(l, r, id);break;}case 2048:{IDFTRecursion<2048>(l, r, id);break;}case 4096:{IDFTRecursion<4096>(l, r, id);break;}case 8192:{IDFTRecursion<8192>(l, r, id);break;}case 16384:{IDFTRecursion<16384>(l, r, id);break;}case 32768:{IDFTRecursion<32768>(l, r, id);break;}case 65536:{IDFTRecursion<65536>(l, r, id);break;}case 131072:{IDFTRecursion<131072>(l, r, id);break;}case 262144:{IDFTRecursion<262144>(l, r, id);break;}case 524288:{IDFTRecursion<524288>(l, r, id);break;}case 1048576:{IDFTRecursion<1048576>(l, r, id);break;}case 2097152:{IDFTRecursion<2097152>(l, r, id);break;}case 4194304:{IDFTRecursion<4194304>(l, r, id);break;}case 8388608:{IDFTRecursion<8388608>(l, r, id);break;}case 16777216:{IDFTRecursion<16777216>(l, r, id);break;}}
+        inline void IDFT(typename std::vector<TDFT>::iterator l, typename std::vector<TDFT>::iterator r) {
+            auto& unitRoots = get_unit_roots();
+            size_t n = r - l;
+            if (n > LEN_THRESHOLD1) {
+                size_t idx = 0;
+                for (auto i = l; i != r; i += LEN_THRESHOLD1, ++idx) IDFTRecursion<LEN_THRESHOLD1>(i, i + LEN_THRESHOLD1,idx);;
+            } else switch (n) {case 128:{IDFTRecursion<128>(l, r);break;}case 256:{IDFTRecursion<256>(l, r);break;}case 512:{IDFTRecursion<512>(l, r);break;}case 1024:{IDFTRecursion<1024>(l, r);break;}case 2048:{IDFTRecursion<2048>(l, r);break;}case 4096:{IDFTRecursion<4096>(l, r);break;}case 8192:{IDFTRecursion<8192>(l, r);break;}case 16384:{IDFTRecursion<16384>(l, r);break;}case 32768:{IDFTRecursion<32768>(l, r);break;}case 65536:{IDFTRecursion<65536>(l, r);break;}case 131072:{IDFTRecursion<131072>(l, r);break;}case 262144:{IDFTRecursion<262144>(l, r);break;}case 524288:{IDFTRecursion<524288>(l, r);break;}case 1048576:{IDFTRecursion<1048576>(l, r);break;}case 2097152:{IDFTRecursion<2097152>(l, r);break;}case 4194304:{IDFTRecursion<4194304>(l, r);break;}case 8388608:{IDFTRecursion<8388608>(l, r);break;}case 16777216:{IDFTRecursion<16777216>(l, r);break;}}
+            for(size_t l2 = LEN_THRESHOLD1; l2 < n; l2 <<= 1)
+                for(auto i = l, ww = unitRoots.begin(); i != r; i += l2 << 1, ++ww) {
+                    auto &w = *ww;
+                    for(auto uu = i, vv = i + l2; uu != i + l2; ++uu, ++vv) {
+                        auto &u = *uu, &v = *vv;
+                        std::tie(u, v) = std::pair{u + v, (u - v) * w};
+                    }
+                }
             std::reverse(l + 1, r);
         }
+        #undef LEN_THRESHOLD0
+        #undef LEN_THRESHOLD1
     public:
         static void clearCache() {
             get_unit_roots().clear();
             get_unit_roots().shrink_to_fit();
-            get_unit_roots().push_back(TFFT(1));
+            get_unit_roots().push_back(TDFT(1));
             get_root_size() = 1;
         }
         using std::vector<T>::operator[];
         Polynomial(const size_t& n = 0, const T& x = T(0)): std::vector<T>(n, x) {}
         Polynomial(const Polynomial& o): std::vector<T>(o) {}
+        Polynomial(Polynomial&& o) noexcept = default;
         Polynomial& operator=(const Polynomial& o) {
             this->resize(o.size());
             for (auto i = this->begin(), j = o.begin(); i != this->end(); ++i, ++j) (*i) = (*j);
             return *this;
         }
+        Polynomial& operator=(Polynomial&& o) noexcept = default;
+        ~Polynomial() = default;
         Polynomial derivative() const {
             if (this->empty()) return Polynomial();
             Polynomial res(this->size() - 1, 0);
             for (size_t i = 0; i < res.size(); i++) res[i] = T(i + 1) * operator[](i + 1);
-            return res;
+            return std::move(res);
         }
         Polynomial integral() const {
             Polynomial res(this->size() + 1);
             for (size_t i = 1; i < res.size(); i++) res[i] = operator[](i - 1) / T(i);
-            return res;
+            return std::move(res);
         }
         Polynomial& derivativeSelf() {
             if (this->empty()) return *this;
@@ -182,23 +230,23 @@ namespace Polynomial {
         T calcIntegral(const T& x) const {
             T tmp(x), res(0);
             for (size_t i = 0; i < this->size(); i++, tmp *= x) res += operator[](i) / T(i + 1) * tmp; 
-            return res;
+            return std::move(res);
         }
         T calcDerivative(const T &x) const {
             T tmp(1), res(0);
             for (size_t i = 1; i < this->size(); i++, tmp *= x) res += operator[](i) * T(i) * tmp;
-            return res;
+            return std::move(res);
         }
         T calc(const T &x) {
             T tmp(1), res(0);
             for (auto i = this->begin(); i != this->end(); ++i, tmp *= x) res += (*i) * tmp;
-            return res;
+            return std::move(res);
         }
         Polynomial operator+(const Polynomial& o) const {
             Polynomial res(*this);
             if (this->size() < o.size()) res.resize(o.size(), T(0));
             for (auto i = res.begin(), j = o.begin(); j != o.end(); ++i, ++j) (*i) += (*j);
-            return res;
+            return std::move(res);
         }
         Polynomial& operator+=(const Polynomial& o) {
             if (this->size() < o.size()) this->resize(o.size(), T(0));
@@ -209,7 +257,7 @@ namespace Polynomial {
             Polynomial res(*this);
             if (this->size() < o.size()) res.resize(o.size(), T(0));
             for (auto i = res.begin(), j = o.begin(); j != o.end(); ++i, ++j) (*i) -= (*j);
-            return res;
+            return std::move(res);
         }
         Polynomial& operator-=(const Polynomial& o) {
             if (this->size() < o.size()) this->resize(o.size(), T(0));
@@ -219,19 +267,19 @@ namespace Polynomial {
         Polynomial operator*(const T& o) const {
             Polynomial res(*this);
             for (auto& i: res) i *= o;
-            return res;
+            return std::move(res);
         }
         Polynomial& operator*=(const T& o) {
             for (auto& i: *this) i *= o;
             return *this;
         }
-        Polynomial operator/(T o) const {
+        Polynomial operator/(const T& o) const {
             Polynomial res(*this);
             o = T(1) / o;
             for (auto& i: res) i *= o;
-            return res;
+            return std::move(res);
         }
-        Polynomial& operator/=(T o) {
+        Polynomial& operator/=(const T& o) {
             o = T(1) / o;
             for (auto& i: *this) i *= o;
             return *this;
@@ -245,37 +293,37 @@ namespace Polynomial {
                     auto k = p;
                     for (auto j = o.begin(); j != o.end(); ++j, ++k) (*k) += (*i) * (*j);
                 }
-                return *this = res;
+                return *this = std::move(res);
             }
             const size_t n = size_t(1) << log2Ceil(this->size() + o.size() - 1);
             ensure_precomputed(n);
             if (this == &o) {
-                if constexpr (std::is_same<TFFT, T>::value) {
+                if constexpr (std::is_same<TDFT, T>::value) {
                     const size_t len = this->size() + o.size() - 1;
                     this->resize(n, T(0));
                     DFT(this->begin(), this->end());
                     for (auto& i : *this) i *= i;
                     IDFT(this->begin(), this->end());
                     this->resize(len);
-                    const TFFT div = TFFT(1) / TFFT(n);
+                    const TDFT div = TDFT(1) / TDFT(n);
                     for (auto& i : *this) i *= div;
                     return *this;
-                } else { // 该部分未测试，理论上应该没问题
-                    std::vector<TFFT> a(n);
+                } else {
+                    std::vector<TDFT> a(n);
                     {
                         auto j = a.begin();
-                        for (auto i = this->begin(); i != this->end(); ++i, ++j) (*j) = T2TFFT(*i);
+                        for (auto i = this->begin(); i != this->end(); ++i, ++j) (*j) = T2TDFT(*i);
                     }
                     DFT(a.begin(), a.end());
                     for (auto& i : a) i *= i;
                     IDFT(a.begin(), a.end());
                     this->resize(this->size() + o.size() - 1, T(0));
-                    const TFFT div = TFFT(1) / TFFT(n);
-                    for (size_t i = 0; i < this->size(); i++) operator[](i) = TFFT2T(a[i] * div);
+                    const TDFT div = TDFT(1) / TDFT(n);
+                    for (size_t i = 0; i < this->size(); i++) operator[](i) = TDFT2T(a[i] * div);
                     return *this;
                 }
             }
-            if constexpr (std::is_same<TFFT, std::complex<T>>::value) {
+            if constexpr (std::is_same<TDFT, std::complex<T>>::value) {
                 std::vector<std::complex<T>> a(n);
                 {
                     auto j = a.begin();
@@ -293,46 +341,46 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++) operator[](i) = a[i].imag() * div;
                 return *this;
             } else {
-                if constexpr (std::is_same<T, TFFT>::value) {
+                if constexpr (std::is_same<T, TDFT>::value) {
                     const size_t len = this->size() + o.size() - 1;
                     this->resize(n, T(0));
-                    std::vector<TFFT> b(o); b.resize(n, T(0));
+                    std::vector<TDFT> b(o); b.resize(n, T(0));
                     DFT(this->begin(), this->end()), DFT(b.begin(), b.end());
                     for (auto i = this->begin(), j = b.begin(); i != this->end(); ++i, ++j) (*i) *= (*j);
                     IDFT(this->begin(), this->end());
                     this->resize(len);
-                    const TFFT div = TFFT(1) / TFFT(n);
+                    const TDFT div = TDFT(1) / TDFT(n);
                     for (auto& i : *this) i *= div;
                     return *this;
                 } else {
-                    std::vector<TFFT> a(n), b(n);
+                    std::vector<TDFT> a(n), b(n);
                     {
                         auto j = a.begin();
-                        for (auto i = this->begin(); i != this->end(); ++i, ++j) (*j) = T2TFFT(*i);
+                        for (auto i = this->begin(); i != this->end(); ++i, ++j) (*j) = T2TDFT(*i);
                     }
                     {
                         auto j = b.begin();
-                        for (auto i = o.begin(); i != o.end(); ++i, ++j) (*j) = T2TFFT(*i);
+                        for (auto i = o.begin(); i != o.end(); ++i, ++j) (*j) = T2TDFT(*i);
                     }
                     DFT(a.begin(), a.end()), DFT(b.begin(), b.end());
                     for (auto i = a.begin(), j = b.begin(); i != a.end(); ++i, ++j) (*i) *= (*j);
                     IDFT(a.begin(), a.end());
                     this->resize(this->size() + o.size() - 1, T(0));
-                    const TFFT div = TFFT(1) / TFFT(n);
-                    for (size_t i = 0; i < this->size(); i++) operator[](i) = TFFT2T(a[i] * div);
+                    const TDFT div = TDFT(1) / TDFT(n);
+                    for (size_t i = 0; i < this->size(); i++) operator[](i) = TDFT2T(a[i] * div);
                     return *this;
                 }
             }
         }
         Polynomial operator*(const Polynomial& o) const {
             Polynomial res(*this);
-            if (this == &o) return res *= res;
-            else return res *= o;
+            if (this == &o) return std::move(res *= res);
+            else return std::move(res *= o);
         }
         Polynomial operator%(size_t n) const {
             Polynomial res(*this);
             res.resize(n);
-            return res;
+            return std::move(res);
         }
         Polynomial& operator%=(size_t n) {
             this->resize(n);
@@ -345,7 +393,7 @@ namespace Polynomial {
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
                 (res += res - res * res * tmp) %= tmp.size();
             }
-            return res;
+            return std::move(res);
         }
         Polynomial& invSelf() {
             Polynomial res(1, T(1) / this->front()), tmp(1, this->front());
@@ -354,53 +402,85 @@ namespace Polynomial {
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
                 (res += res - res * res * tmp) %= tmp.size();
             }
-            return *this = res;
+            return *this = std::move(res);
         }
-        Polynomial ln() const { return (this->derivative() * this->inv()).integralSelf() %= this->size(); }
+        template<auto LN = __return0>
+        Polynomial ln() const { 
+            auto res = *this;
+            auto frt = res.front(), inv = T(1) / frt;
+            for (auto& i : res) i *= inv;
+            return std::move(((res.derivative() * res.inv()).integralSelf() += Polynomial(1, LN(frt))) %= this->size());
+            // 我也不知道为什么这样写是可行的，并没有出问题就留着了，有问题了化可以提出修改建议
+        }
+        template<auto LN = __return0>
         Polynomial& lnSelf() {
+            auto frt = this->front(), inv = T(1) / frt;
+            for (auto& i : *this) i *= inv;
             size_t n = this->size();
             *this = this->derivative() * this->inv();
-            return this->integralSelf() %= n;
+            return (this->integralSelf() += Polynomial(1, LN(frt))) %= n;
         }
+        template<auto EXP = __return1>
         Polynomial exp() const {
             if (this->empty()) return Polynomial(0, T(0));
-            Polynomial res(1, T(1)), tmp(1, this->front());
+            Polynomial res(1, EXP(this->front())), tmp(1, this->front());
             while (res.size() < this->size()) {
                 tmp.resize(std::min(this->size(), res.size() << 1), T(0));
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
                 (res += res * (tmp - (res % tmp.size()).ln())) %= tmp.size();
             }
-            return res;
+            return std::move(res);
         }
+        template<auto EXP = __return1>
         Polynomial& expSelf() {
             if (this->empty()) return *this = Polynomial(0, T(0));
-            Polynomial res(1, T(1)), tmp(1, this->front());
+            Polynomial res(1, EXP(this->front())), tmp(1, this->front());
             while (res.size() < this->size()) {
                 tmp.resize(std::min(this->size(), res.size() << 1), T(0));
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
                 (res += res * (tmp - (res % tmp.size()).ln())) %= tmp.size();
             }
-            return *this = res;
+            return *this = std::move(res);
         }
+        template<auto SQRT = __return1>
         Polynomial sqrt() const {
             if (this->empty()) return Polynomial(0, T(0));
-            Polynomial res(1, T(1)), tmp(1, this->front());
+            Polynomial res(1, SQRT(this->front())), tmp(1, this->front());
             while (res.size() < this->size()) {
                 tmp.resize(std::min(this->size(), res.size() << 1), T(0));
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
                 (res = (tmp + res * res) * ((res + res) % tmp.size()).inv()) %= tmp.size();
             }
-            return res;
+            return std::move(res);
         }
+        template<auto SQRT = __return1>
         Polynomial& sqrtSelf() {
             if (this->empty()) return *this = Polynomial(0, T(0));
-            Polynomial res(1, T(1)), tmp(1, this->front());
+            Polynomial res(1, SQRT(this->front())), tmp(1, this->front());
             while (res.size() < this->size()) {
                 tmp.resize(std::min(this->size(), res.size() << 1), T(0));
                 for (auto i = tmp.begin() + res.size(), j = this->begin() + res.size(); i != tmp.end(); ++i, ++j) (*i) = (*j);
                 (res = (tmp + res * res) * ((res + res) % tmp.size()).inv()) %= tmp.size();
             }
-            return *this = res; 
+            return *this = std::move(res); 
+        }
+        template<typename U>
+        Polynomial& powSelf(U n, U m = U(-1)) {
+            auto frt = this->front(), inv = T(1) / frt;
+            for (auto& i : *this) i *= inv;
+            if (m == (U)(-1)) m = n;
+            auto r = T(1);
+            while (m) {
+                if (m & 1) r *= frt;
+                frt *= frt;
+                m >>= 1;
+            }
+            return (this->lnSelf() *= T(n)).expSelf() *= r;
+        }
+        template<typename U>
+        Polynomial pow(U n, U m = U(-1)) {
+            Polynomial res(*this);
+            return std::move(res.powSelf(n, m));
         }
         Polynomial operator|(const Polynomial& o) const {
             if (std::min(this->size(), o.size()) <= 64) {
@@ -409,7 +489,7 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i | j] += operator[](i) * o[j];
-                return res;
+                return std::move(res);
             }
             const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
@@ -430,7 +510,7 @@ namespace Polynomial {
                     if ((S >> i) & 1) tmp1[S] -= tmp1[S ^ (size_t(1) << i)];
                 }
             }
-            return tmp1;
+            return std::move(tmp1);
         }
         Polynomial& operator|=(const Polynomial& o) {
             if (std::min(this->size(), o.size()) <= 64) {
@@ -439,7 +519,7 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i | j] += operator[](i) * o[j];
-                return *this = res;
+                return *this = std::move(res);
             }
             const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
@@ -467,7 +547,7 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i & j] += operator[](i) * o[j];
-                return res;
+                return std::move(res);
             }
             const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
@@ -488,7 +568,7 @@ namespace Polynomial {
                     tmp1[S] -= tmp1[S ^ (size_t(1) << i)];
                 }
             }
-            return tmp1;
+            return std::move(tmp1);
         }
         Polynomial& operator&=(const Polynomial& o) {
             if (std::min(this->size(), o.size()) <= 64) {
@@ -497,7 +577,7 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i & j] += operator[](i) * o[j];
-                return *this = res;
+                return *this = std::move(res);
             }
             const size_t lgn = log2Ceil(std::max(this->size(), o.size()));
             const size_t n = size_t(1) << lgn;
@@ -527,7 +607,7 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i ^ j] += operator[](i) * o[j];
-                return res;
+                return std::move(res);
             }
             const size_t n = size_t(1) << log2Ceil(std::max(this->size(), o.size()));
             Polynomial tmp1(*this), tmp2(o);
@@ -554,7 +634,7 @@ namespace Polynomial {
                     }
                 }
             }
-            return tmp1;
+            return std::move(tmp1);
         }
         Polynomial& operator^=(const Polynomial& o) {
             if (std::min(this->size(), o.size()) <= 64) {
@@ -563,7 +643,7 @@ namespace Polynomial {
                 for (size_t i = 0; i < this->size(); i++)
                     for (size_t j = 0; j < o.size(); j++)
                         res[i ^ j] += operator[](i) * o[j];
-                return *this = res;
+                return *this = std::move(res);
             }
             const size_t n = size_t(1) << log2Ceil(std::max(this->size(), o.size()));
             Polynomial tmp(o);
@@ -600,294 +680,13 @@ namespace Polynomial {
             }
             return os;
         }
+        Polynomial operator/(const Polynomial& o) const {
+            Polynomial res(*this);
+            return std::move(res *= o.inv());
+        }
+        Polynomial& operator/=(const Polynomial& o) {
+            return *this *= o.inv();
+        }
     };
 }
-/////////////////////////////////////////////
-
-// #ifndef MODULAR_H
-// #define MODULAR_H
-// namespace Modular {
-//     template <typename T = int, const T MOD = 998244353, typename MCT = unsigned long long>
-//     class Modular {
-//     private:
-//         T value;
-//         // T exgcd(const T& a, const T& b, T& x, T& y) const {
-//         //     if (b == 0) {
-//         //         x = 1, y = 0;
-//         //         return a;
-//         //     }
-//         //     T g = exgcd(b, a % b, y, x);
-//         //     y -= static_cast<MultiplicationType>(a / b) * static_cast<MultiplicationType>(x) % MOD;
-//         //     if (y < 0) y += MOD;
-//         //     if (y >= MOD) y -= MOD;
-//         //     return g;
-//         // }
-//     public:
-//         constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
-//         constexpr Modular(const Modular& other) : value(other.value) {}
-//         Modular& operator=(const Modular& other) { value = other.value; return *this; }
-//         Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
-        
-//         T getVal() const { return value; }
-//         Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
-
-//         Modular operator-() const {
-//             Modular res(*this);
-//             if (res.value != T(0)) res.value = MOD - res.value;
-//             return res;
-//         }
-//         friend Modular operator+(const Modular& a, const Modular& b) { 
-//             Modular res(a);
-//             if ((res.value += b.value) >= MOD) res.value -= MOD;
-//             return res;
-//         }
-//         friend Modular operator-(const Modular& a, const Modular& b) { 
-//             Modular res(a);
-//             if ((res.value -= b.value) < T(0)) res.value += MOD;
-//             return res;
-//         }
-//         friend Modular operator*(const Modular& a, const Modular& b) { return Modular((MCT) a.value * (MCT) b.value % MOD); }
-//         Modular& operator+=(const Modular& other) { 
-//             if ((value += other.value) >= MOD) value -= MOD;
-//             return *this; 
-//         }
-//         Modular& operator-=(const Modular& other) { 
-//             if ((value -= other.value) < 0) { value += MOD; } 
-//             return *this; 
-//         }
-//         Modular& operator*=(const Modular& other) { 
-//             value = (MCT) value * (MCT) other.value % MOD; 
-//             return *this; 
-//         }
-//         template <typename U>
-//         Modular fPow(U exp) const {
-//             Modular result(1);
-//             T base = value;
-//             while (exp) {
-//                 if (exp & 1) result.value = (MCT) result.value * (MCT) base % MOD;
-//                 base = (MCT) base * (MCT) base % MOD;
-//                 exp >>= 1;
-//             }
-//             return result;
-//         }
-//         template <typename U>
-//         Modular& fPowSelf(U exp) {
-//             T base = value;
-//             value = 1;
-//             while (exp) {
-//                 if (exp & 1) value = (MCT) value * (MCT) base % MOD;
-//                 base = (MCT) base * (MCT) base % MOD;
-//                 exp >>= 1;
-//             }
-//             return *this;
-//         }
-//         Modular inv() const {
-//             return fPow(MOD - 2);
-//             // T x, y;
-//             // T g = exgcd(value, MOD, x, y);
-//             // assert(g == 1);
-//             // return Modular(x);
-//         }
-//         Modular& invSelf() {
-//             return fPowSelf(MOD - 2);
-//             // T x, y;
-//             // T g = exgcd(value, MOD, x, y);
-//             // assert(g == 1); 
-//             // value = x;
-//             // return *this;
-//         }
-//         // 除法运算
-//         friend Modular operator/(const Modular& a, const Modular& b) { return a * b.inv(); }
-//         Modular& operator/=(const Modular& other) { return *this *= other.inv(); }
-//         // 比较运算
-//         friend bool operator==(const Modular& a, const Modular& b) { return a.value == b.value; }
-//         friend bool operator!=(const Modular& a, const Modular& b) { return a.value != b.value; }
-//         friend std::ostream& operator<<(std::ostream& os, const Modular& m) { return os << m.value; }
-//         friend std::istream& operator>>(std::istream& is, Modular& m) { 
-//             T v; 
-//             is >> v; 
-//             m.setVal(v); 
-//             return is; 
-//         }
-//     };
-// }
-// #endif
-// #include <cstdio>
-// #include <cstddef>
-// #include <cctype>
-// #include <type_traits>
-// #include <string>
-// template<size_t BUF_SIZE>
-// class FastIO {
-// private:
-//     char outdata[BUF_SIZE], indata[BUF_SIZE];
-//     size_t n, outidx, inidx;
-//     FILE* inFile;
-//     FILE* outFile;
-//     // int floatPrecision = 6;
-//     // bool useScientific = true;
-// public:
-//     FastIO(FILE* in = stdin, FILE* out = stdout) : n(0), outidx(0), inidx(0), inFile(in), outFile(out) {}
-
-//     // inline void setPrecision(int p) { floatPrecision = p; }
-//     // inline void setScientific(bool enable) { useScientific = enable; }
-
-//     inline void putchar(char c) {
-//         outdata[outidx++] = c;
-//         if (outidx == BUF_SIZE) {
-//             std::fwrite(outdata, 1, BUF_SIZE, outFile);
-//             outidx = 0;
-//         }
-//     }
-//     inline void flush() { if (outidx) std::fwrite(outdata, 1, outidx, outFile), outidx = 0; }
-//     inline char getchar() {
-//         if (inidx >= n) {
-//             n = std::fread(indata, 1, BUF_SIZE, inFile);
-//             inidx = 0;
-//             if (n == 0) return -1;
-//         }
-//         return indata[inidx++];
-//     }
-//     template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-//     inline FastIO& operator<<(T x) {
-//         static char s[40];
-//         if (x < 0) putchar('-'), x = -x;
-//         int n = 0;
-//         do s[n++] = x % 10 | 0x30, x /= 10;
-//         while (x);
-//         while (n--) putchar(s[n]);
-//         return *this;
-//     }
-//     template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
-//     inline FastIO& operator>>(T& x) {
-//         x = 0;
-//         char ch = getchar();
-//         bool flag = false;
-//         while (!std::isdigit(ch)) {
-//             if (ch == '-') flag = true;
-//             ch = getchar();
-//         }
-//         while (std::isdigit(ch)) {
-//             x = (x << 3) + (x << 1) + (ch ^ 0x30);
-//             ch = getchar();
-//         }
-//         if (flag) x = -x;
-//         return *this;
-//     }
-//     template<typename T, typename std::enable_if<std::is_floating_point<T>::value, int>::type = 0>
-//     inline FastIO& operator>>(T& x) {
-//         x = 0;
-//         bool neg = false;
-//         char ch = getchar();
-//         while (!std::isdigit(ch) && ch != '.') {
-//             if (ch == '-') neg = true;
-//             ch = getchar();
-//         }
-//         while (std::isdigit(ch)) {
-//             x = x * 10 + (ch ^ 0x30);
-//             ch = getchar();
-//         }
-//         if (ch == '.') {
-//             ch = getchar();
-//             T div = static_cast<T>(1);
-//             while (isdigit(ch)) {
-//                 div /= 10;
-//                 x += (ch ^ 0x30) * div;
-//                 ch = getchar();
-//             }
-//         }
-//         if (neg) x = -x;
-//         if (ch == 'E' || ch == 'e') {
-//             ch = getchar();
-//             neg = false;
-//             if (ch == '+') {
-//                 ch = getchar();
-//             } else if (ch == '-') {
-//                 neg = true;
-//                 ch = getchar();
-//             }
-//             int exp = 0;
-//             while (isdigit(ch)) {
-//                 exp = (exp << 3) + (exp << 1) + (ch ^ 0x30);
-//                 ch = getchar();
-//             }
-//             T base = 10;
-//             if (neg) {
-//                 while (exp) {
-//                     if (exp & 1) x /= base;
-//                     base *= base;
-//                     exp >>= 1;
-//                 }
-//             } else {
-//                 while (exp) {
-//                     if (exp & 1) x *= base;
-//                     base *= base;
-//                     exp >>= 1;
-//                 }
-//             }
-//         }
-//         return *this;
-//     }
-//     inline FastIO& operator<<(char ch) { putchar(ch); return *this; }
-//     inline FastIO& operator>>(char& ch) {
-//         ch = getchar();
-//         while(!std::isgraph(ch)) ch = getchar();
-//         return *this;
-//     }
-//     inline FastIO& operator<<(const std::string& s) {
-//         for (const auto& i : s) putchar(i);
-//         return *this;
-//     }
-//     inline FastIO& operator>>(std::string& s) {
-//         char ch = getchar();
-//         while(!std::isgraph(ch)) ch = getchar();
-//         s.clear();
-//         do s.push_back(ch), ch = getchar();
-//         while (std::isgraph(ch));
-//         return *this;
-//     }
-//     ~FastIO() {
-//         flush();
-//     }
-// };
-// #include <bits/stdc++.h>
-// FastIO<(1 << 20) * 4> __IOER__;
-// #define cin __IOER__
-// #define cout __IOER__
-// #define getchar __IOER__.getchar
-// #define putchar __IOER__.putchar
-// #define fflush(stdout) __IOER__.flush()
-// #define endl '\n'
-// using namespace std;
-// using Mint = Modular::Modular<int, 998244353, unsigned long long>;
-// inline Mint funcT2TNTT(Mint x) { return x; }
-// inline Mint funcTNTT2T(Mint x) { return x; }
-// inline Mint funcNTT(size_t x) { return Mint(3).fPow(998244352 / x); } // 332748118
-// // int main() {
-// //     int n, m;
-// //     cin >> n >> m;
-// //     Polynomial::Polynomial<Mint, Mint, funcT2TNTT, funcTNTT2T, funcNTT> a(n + 1), b(m + 1);
-// //     int t;
-// //     for (auto& x: a)
-// //         cin >> t, x.setVal(t);
-// //     for (auto& x: b)
-// //         cin >> t, x.setVal(t);
-// //     a *= b;
-// //     for (auto& x : a)
-// //         cout << x.getVal() << ' ';
-// //     return 0;
-// // }
-// // int main() { // f
-// //     int n, m;
-// //     cin >> n >> m;
-// //     Polynomial::Polynomial<double, complex<double>, Polynomial::T2TFFT, Polynomial::TFFT2T, Polynomial::expn> a(n + 1), b(m + 1);
-// //     for (auto& x: a)
-// //         cin >> x;
-// //     for (auto& x: b)
-// //         cin >> x;
-// //     a *= b;
-// //     for (auto& x : a)
-// //         cout << (int)(x + 0.5) << ' ';
-// //     return 0;
-// // }
 #endif
