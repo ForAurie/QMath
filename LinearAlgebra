@@ -16,13 +16,13 @@ namespace QMath {
 		std::unique_ptr<Type[]> data;
 		public:
 		Matrix(): n(0), m(0), data(nullptr) {}
-		Matrix(size_t __n, size_t __m, const Type& x = Type(0)): n(__n), m(__m), data(std::make_unique<Type[]>(__n * __m)) { std::fill_n(data.get(), __n * __m, x); }
+		Matrix(size_t __n, size_t __m, const Type& x = Type()): n(__n), m(__m), data(std::make_unique<Type[]>(__n * __m)) { std::fill_n(data.get(), __n * __m, x); }
 		Matrix(Matrix&& o) noexcept : n(o.n), m(o.m), data(std::move(o.data)) { o.n = o.m = 0; }
 		Matrix& operator=(Matrix&& o) noexcept {
 			if (this != &o) { n = o.n; m = o.m; data = std::move(o.data); o.n = o.m = 0; }
 			return *this;
 		}
-		Matrix& resize(size_t __n, size_t __m, const Type& x = Type(0)) {
+		Matrix& resize(size_t __n, size_t __m, const Type& x = Type()) {
 			n = __n, m = __m; data = std::make_unique<Type[]>(__n * __m);
 			std::fill_n(data.get(), __n * __m, x);
 			return *this;
@@ -36,7 +36,6 @@ namespace QMath {
 			if (o.data == nullptr || n == 0 || m == 0) return;
 			data = std::make_unique<Type[]>(n * m);
 			for (Type *ptr = o.data.get(), *end = o.data.get() + n * m, *ptrr = data.get(); ptr != end; ++ptr, ++ptrr) *ptrr = *ptr;
-			// std::copy(o.data.get(), o.data.get() + n * m, data.get());
 		}
 		Type* operator[](size_t row) { return data.get() + row * m; }
 		const Type* operator[](size_t row) const { return data.get() + row * m; }
@@ -48,7 +47,6 @@ namespace QMath {
 				}
 				n = o.n; m = o.m; data = std::make_unique<Type[]>(n * m);
 				for (Type *ptr = o.data.get(), *end = o.data.get() + n * m, *ptrr = data.get(); ptr != end; ++ptr, ++ptrr) *ptrr = *ptr;
-				// std::copy(o.data.get(), o.data.get() + n * m, data.get());
 			}
 			return *this;
 		}
@@ -211,4 +209,5 @@ namespace QMath {
 		}
 	};
 }
+
 #endif
