@@ -7,12 +7,12 @@ namespace QMath {
     private:
         T value;
     public:
-        constexpr Modular(const T& v = T(0)) : value(v % MOD) { if (value < T(0)) value += MOD; }
+        constexpr Modular(const T& v = T()) : value(v % MOD) { if (value < T(0)) value += MOD; }
         constexpr Modular(const Modular& other) : value(other.value) {}
         Modular& operator=(const Modular& other) { value = other.value; return *this; }
         Modular& operator=(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
         
-        T getVal() const { return value; }
+        const T& getVal() const { return value; }
         Modular& setVal(const T& v) { value = v % MOD; if (value < T(0)) value += MOD; return *this; }
 
         Modular operator-() const {
