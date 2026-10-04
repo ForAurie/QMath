@@ -12,7 +12,7 @@
 
 ### 一、位置
 
-该类型位于 `LinearAlgebra` 文件的 `QMath` 命名空间中，你可以通过 `QMath:Matrix<...>` 调用。
+该类型位于 `LinearAlgebra.hpp` 文件的 `QMath` 命名空间中，你可以通过 `QMath:Matrix<...>` 调用。
 
 ### 二、模板参数
 

@@ -34,7 +34,7 @@
 
 ### 一、位置
 
-该类型位于 `Polynomial` 文件的 `QMath` 命名空间中，你可以通过 `QMath:Polynomial<...>` 调用。
+该类型位于 `Polynomial.hpp` 文件的 `QMath` 命名空间中，你可以通过 `QMath:Polynomial<...>` 调用。
 
 ### 二、模板参数
 
@@ -58,11 +58,11 @@ template <
 
 ```cpp
 namespace QMath {
-    namespace detial {
+    namespace detail {
         constexpr double PI2 = 6.283185307179586476925286766559005768394338798750211641949889;
     }
 
-    std::complex<double> expn(size_t n) { return std::complex<double>(std::cos(detial::PI2 / n), std::sin(detial::PI2 / n)); }
+    std::complex<double> expn(size_t n) { return std::complex<double>(std::cos(detail::PI2 / n), std::sin(detail::PI2 / n)); }
 
     std::complex<double> T2TFFT(double x) { return std::complex<double>(x, 0); }
     
