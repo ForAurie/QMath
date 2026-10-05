@@ -72,7 +72,7 @@ namespace QMath {
 
 非常简短，就是普通 FFT 所需的实现。
 
-当然，这个类模板也支持 NTT，但需要准备一个自动取模类型和一套相关实现，建议使用此仓库的 `QMath::Modular`，点击[此处](https://github.com/ForAurie/QMath/blob/main/Documents/Chinese/Modular.md)阅读有关 `QMath::Modular` 相关内容。
+当然，这个类模板也支持 NTT，但需要准备一个自动取模类型和一套相关实现，建议使用此仓库的 `QMath::Modular`，点击[此处](./Modular.md)阅读有关 `QMath::Modular` 相关内容。
 
 **注意：如果你在测试 Polynomial 类模板性能时使用别的自动取模类模板，可能达不到预期效果**。
 
